@@ -1,6 +1,6 @@
 'use client';
 
-import { Logo, LogoModern, LogoMinimal, LogoAnimated } from '@/components/ui/Logo';
+import { Logo, LogoModern, LogoMinimal, LogoAnimated, LogoUltraMinimal, LogoOutline, LogoSplit, LogoBadge, LogoSnake, LogoSnake2, LogoSnake3, LogoSnake4, LogoSnakeEat } from '@/components/ui/Logo';
 import { ThemeLanguageToggle } from '@/components/layout';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -25,6 +25,89 @@ export default function LogoPreviewPage() {
         <p className="text-muted-foreground mb-12">Select your preferred logo design</p>
 
         <div className="space-y-16">
+          {/* Snake Series - 贪吃蛇风格 */}
+          <section className="space-y-6">
+            <div className="border-b border-border pb-4">
+              <h2 className="text-2xl font-bold text-foreground mb-1">🐍 Snake Series</h2>
+              <p className="text-sm text-muted-foreground">贪吃蛇 S 吃小球 o 的设计</p>
+            </div>
+
+            {/* Snake V1 */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Snake V1: Classic</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                  <LogoSnake size="xl" />
+                </div>
+                <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                  <LogoSnake size="xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Snake V2 */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Snake V2: Green Theme</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                  <LogoSnake2 size="xl" />
+                </div>
+                <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                  <LogoSnake2 size="xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Snake V3 */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Snake V3: Pixel Style</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                  <LogoSnake3 size="xl" />
+                </div>
+                <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                  <LogoSnake3 size="xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Snake V4 */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Snake V4: Smooth Flow</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                  <LogoSnake4 size="xl" />
+                </div>
+                <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                  <LogoSnake4 size="xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Snake V5 - Eating */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Snake V5: Eating (张嘴吃球)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                  <LogoSnakeEat size="xl" />
+                </div>
+                <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                  <LogoSnakeEat size="xl" />
+                </div>
+              </div>
+            </div>
+
+            {/* Size comparison */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">All Sizes</h3>
+              <div className="flex items-center gap-8 p-6 rounded-2xl bg-card border border-border justify-center flex-wrap">
+                <LogoSnakeEat size="sm" />
+                <LogoSnakeEat size="md" />
+                <LogoSnakeEat size="lg" />
+                <LogoSnakeEat size="xl" />
+              </div>
+            </div>
+          </section>
           {/* Option 1: Gradient with S */}
           <section className="space-y-6">
             <div>
@@ -85,11 +168,11 @@ export default function LogoPreviewPage() {
             </div>
           </section>
 
-          {/* Option 3: Minimal Geometric */}
+          {/* Option 3: Minimal Geometric - Refined */}
           <section className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold text-foreground mb-1">Option 3: Minimal Geometric</h2>
-              <p className="text-sm text-muted-foreground">Clean, abstract S shape - professional and timeless</p>
+              <h2 className="text-xl font-semibold text-foreground mb-1">Option 3A: Minimal Refined</h2>
+              <p className="text-sm text-muted-foreground">Elegant S in rounded square with accent dot</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -98,6 +181,80 @@ export default function LogoPreviewPage() {
               </div>
               <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
                 <LogoMinimal size="xl" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-8 p-6 rounded-2xl bg-card border border-border justify-center">
+              <LogoMinimal size="sm" />
+              <LogoMinimal size="md" />
+              <LogoMinimal size="lg" />
+            </div>
+          </section>
+
+          {/* Option 3B: Ultra Minimal */}
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground mb-1">Option 3B: Ultra Minimal</h2>
+              <p className="text-sm text-muted-foreground">Bold S lettermark - maximum simplicity</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                <LogoUltraMinimal size="xl" />
+              </div>
+              <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                <LogoUltraMinimal size="xl" />
+              </div>
+            </div>
+          </section>
+
+          {/* Option 3C: Outline */}
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground mb-1">Option 3C: Outline</h2>
+              <p className="text-sm text-muted-foreground">Light and modern outline style</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                <LogoOutline size="xl" />
+              </div>
+              <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                <LogoOutline size="xl" />
+              </div>
+            </div>
+          </section>
+
+          {/* Option 3D: Split */}
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground mb-1">Option 3D: Split</h2>
+              <p className="text-sm text-muted-foreground">Two-tone modern split design</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                <LogoSplit size="xl" />
+              </div>
+              <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                <LogoSplit size="xl" />
+              </div>
+            </div>
+          </section>
+
+          {/* Option 3E: Badge */}
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground mb-1">Option 3E: Badge</h2>
+              <p className="text-sm text-muted-foreground">Circular badge with ring - premium feel</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-8 rounded-2xl bg-card border border-border flex items-center justify-center">
+                <LogoBadge size="xl" />
+              </div>
+              <div className="p-8 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                <LogoBadge size="xl" />
               </div>
             </div>
           </section>

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { FileText, Users, Package, Clock, Settings } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { ThemeLanguageToggle } from './ThemeLanguageToggle';
-import { LogoModern } from '@/components/ui/Logo';
+import { LogoSnake3 } from '@/components/ui/Logo';
 
 const navItems = [
   { href: '/invoice', labelKey: 'nav.invoice', icon: FileText },
@@ -25,7 +25,7 @@ export function Sidebar() {
         {/* Logo & Toggle */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-border">
           <Link href="/">
-            <LogoModern size="md" />
+            <LogoSnake3 size="md" />
           </Link>
           <ThemeLanguageToggle />
         </div>

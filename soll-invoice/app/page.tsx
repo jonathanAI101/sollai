@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Zap, Shield, Globe, ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Sparkles, Globe, Users, Search, BarChart3, FileText, Handshake, DollarSign, Calendar, Zap } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { ThemeLanguageToggle } from '@/components/layout';
-import { LogoModern } from '@/components/ui/Logo';
+import { LogoSnake3 } from '@/components/ui/Logo';
 
 export default function LandingPage() {
   const { t } = useI18n();
@@ -15,7 +15,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/">
-            <LogoModern size="md" />
+            <LogoSnake3 size="md" />
           </Link>
           <div className="flex items-center gap-4">
             <ThemeLanguageToggle />
@@ -71,16 +71,16 @@ export default function LandingPage() {
           {/* Trust Indicators */}
           <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-green-500" />
-              {t('landing.trust.free')}
+              <Users className="w-4 h-4 text-blue-500" />
+              {t('landing.trust.ai')}
             </div>
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-green-500" />
-              {t('landing.trust.noCard')}
+              <Globe className="w-4 h-4 text-green-500" />
+              {t('landing.trust.global')}
             </div>
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-green-500" />
-              {t('landing.trust.local')}
+              <Sparkles className="w-4 h-4 text-purple-500" />
+              {t('landing.trust.fast')}
             </div>
           </div>
         </div>
@@ -92,20 +92,20 @@ export default function LandingPage() {
           <p className="text-center text-sm text-muted-foreground mb-6">{t('landing.social.title')}</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <p className="text-3xl md:text-4xl font-bold text-foreground">10K+</p>
-              <p className="text-sm text-muted-foreground mt-1">{t('landing.social.invoices')}</p>
+              <p className="text-3xl md:text-4xl font-bold text-foreground">50+</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('landing.social.brands')}</p>
+            </div>
+            <div>
+              <p className="text-3xl md:text-4xl font-bold text-foreground">1K+</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('landing.social.campaigns')}</p>
             </div>
             <div>
               <p className="text-3xl md:text-4xl font-bold text-foreground">50+</p>
               <p className="text-sm text-muted-foreground mt-1">{t('landing.social.countries')}</p>
             </div>
             <div>
-              <p className="text-3xl md:text-4xl font-bold text-foreground">99.9%</p>
-              <p className="text-sm text-muted-foreground mt-1">{t('landing.social.uptime')}</p>
-            </div>
-            <div>
-              <p className="text-3xl md:text-4xl font-bold text-foreground">4.9</p>
-              <p className="text-sm text-muted-foreground mt-1">{t('landing.social.rating')}</p>
+              <p className="text-3xl md:text-4xl font-bold text-foreground">200%</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('landing.social.roi')}</p>
             </div>
           </div>
         </div>
@@ -118,16 +118,13 @@ export default function LandingPage() {
             <h2 className="text-2xl md:text-3xl font-bold text-foreground">
               {t('landing.features.title')}
             </h2>
-            <p className="mt-4 text-muted-foreground max-w-xl mx-auto">
-              {t('landing.features.subtitle')}
-            </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Feature 1 - Find Creators */}
             <div className="p-6 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-blue-500" />
+                <Search className="w-6 h-6 text-blue-500" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
                 {t('landing.feature1.title')}
@@ -137,10 +134,10 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Feature 2 */}
+            {/* Feature 2 - Manage */}
             <div className="p-6 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
               <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mb-4">
-                <Shield className="w-6 h-6 text-green-500" />
+                <Handshake className="w-6 h-6 text-green-500" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
                 {t('landing.feature2.title')}
@@ -150,16 +147,29 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Feature 3 */}
+            {/* Feature 3 - Track */}
             <div className="p-6 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
               <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
-                <Globe className="w-6 h-6 text-purple-500" />
+                <BarChart3 className="w-6 h-6 text-purple-500" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
                 {t('landing.feature3.title')}
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {t('landing.feature3.desc')}
+              </p>
+            </div>
+
+            {/* Feature 4 - Offline Events */}
+            <div className="p-6 rounded-2xl bg-card border border-border hover:border-primary/50 transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center mb-4">
+                <Calendar className="w-6 h-6 text-orange-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                {t('landing.feature4.title')}
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {t('landing.feature4.desc')}
               </p>
             </div>
           </div>
@@ -177,17 +187,23 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
-              <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground font-bold flex items-center justify-center mx-auto mb-4">1</div>
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-7 h-7" />
+              </div>
               <h3 className="font-semibold text-foreground mb-2">{t('landing.step1.title')}</h3>
               <p className="text-sm text-muted-foreground">{t('landing.step1.desc')}</p>
             </div>
             <div className="text-center">
-              <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground font-bold flex items-center justify-center mx-auto mb-4">2</div>
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-7 h-7" />
+              </div>
               <h3 className="font-semibold text-foreground mb-2">{t('landing.step2.title')}</h3>
               <p className="text-sm text-muted-foreground">{t('landing.step2.desc')}</p>
             </div>
             <div className="text-center">
-              <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground font-bold flex items-center justify-center mx-auto mb-4">3</div>
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+                <DollarSign className="w-7 h-7" />
+              </div>
               <h3 className="font-semibold text-foreground mb-2">{t('landing.step3.title')}</h3>
               <p className="text-sm text-muted-foreground">{t('landing.step3.desc')}</p>
             </div>
@@ -217,7 +233,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-border">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <LogoModern size="sm" />
+          <LogoSnake3 size="sm" />
           <p className="text-xs text-muted-foreground">
             {t('landing.footer.privacy')}
           </p>
