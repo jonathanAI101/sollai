@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Store, FileText, Wallet } from 'lucide-react';
+import { LayoutDashboard, Users, Store, FileText, Settings } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
 const navItems = [
@@ -10,7 +10,7 @@ const navItems = [
   { href: '/creators', labelKey: 'nav.creators', icon: Users },
   { href: '/merchants', labelKey: 'nav.merchants', icon: Store },
   { href: '/invoice', labelKey: 'nav.invoice', icon: FileText },
-  { href: '/settlement', labelKey: 'nav.settlement', icon: Wallet },
+  { href: '/settings', labelKey: 'nav.settings', icon: Settings },
 ];
 
 export function MobileNav() {

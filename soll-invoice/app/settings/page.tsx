@@ -1,31 +1,67 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Layout, Header } from '@/components/layout';
-import { CompanyList } from '@/components/settings';
-import { Download, Upload, Building2 } from 'lucide-react';
-import { exportAllData, importAllData } from '@/lib/db';
+import { Download, Upload, Building2, Sun, Moon, Monitor, Globe } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import { Button } from '@/components/ui/Button';
+
+type Theme = 'light' | 'dark' | 'system';
 
 export default function SettingsPage() {
-  const { t } = useI18n();
+  const { t, language, setLanguage } = useI18n();
+  const [theme, setThemeState] = useState<Theme>('system');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('theme') as Theme | null;
+    if (stored) {
+      setThemeState(stored);
+    }
+  }, []);
+
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme);
+    localStorage.setItem('theme', newTheme);
+
+    const root = document.documentElement;
+    if (newTheme === 'dark') {
+      root.classList.add('dark');
+    } else if (newTheme === 'light') {
+      root.classList.remove('dark');
+    } else {
+      // System preference
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    }
+  };
 
   const handleExport = async () => {
     try {
-      const data = await exportAllData();
+      const data = {
+        version: '1.0.0',
+        exportDate: new Date().toISOString(),
+        settings: {
+          theme,
+          language,
+        },
+      };
       const blob = new Blob([JSON.stringify(data, null, 2)], {
         type: 'application/json',
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `sollai-invoice-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `sollai-backup-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('导出失败，请重试');
+      alert(language === 'zh' ? '导出失败，请重试' : 'Export failed, please try again');
     }
   };
 
@@ -40,12 +76,16 @@ export default function SettingsPage() {
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        await importAllData(data);
-        alert('导入成功！请刷新页面查看数据。');
-        window.location.reload();
+        if (data.settings?.theme) {
+          setTheme(data.settings.theme);
+        }
+        if (data.settings?.language) {
+          setLanguage(data.settings.language);
+        }
+        alert(language === 'zh' ? '导入成功！' : 'Import successful!');
       } catch (error) {
         console.error('Import failed:', error);
-        alert('导入失败，请检查文件格式');
+        alert(language === 'zh' ? '导入失败，请检查文件格式' : 'Import failed, please check file format');
       }
     };
     input.click();
@@ -56,9 +96,93 @@ export default function SettingsPage() {
       <Header title={t('settings.title')} />
 
       <div className="p-4 md:p-6 space-y-6">
-        {/* Company List Section */}
+        {/* Theme Settings */}
         <section>
-          <CompanyList />
+          <h2 className="text-base font-semibold text-foreground mb-4">{t('theme.title')}</h2>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                onClick={() => setTheme('light')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+                  theme === 'light'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <Sun className={`w-6 h-6 ${theme === 'light' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={`text-sm font-medium ${theme === 'light' ? 'text-primary' : 'text-foreground'}`}>
+                  {t('theme.light')}
+                </span>
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+                  theme === 'dark'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <Moon className={`w-6 h-6 ${theme === 'dark' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-primary' : 'text-foreground'}`}>
+                  {t('theme.dark')}
+                </span>
+              </button>
+              <button
+                onClick={() => setTheme('system')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+                  theme === 'system'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <Monitor className={`w-6 h-6 ${theme === 'system' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={`text-sm font-medium ${theme === 'system' ? 'text-primary' : 'text-foreground'}`}>
+                  {t('theme.system')}
+                </span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Language Settings */}
+        <section>
+          <h2 className="text-base font-semibold text-foreground mb-4">{t('language.title')}</h2>
+          <div className="bg-card rounded-lg border border-border p-4">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setLanguage('zh')}
+                className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
+                  language === 'zh'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <Globe className={`w-5 h-5 ${language === 'zh' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <div className="text-left">
+                  <p className={`text-sm font-medium ${language === 'zh' ? 'text-primary' : 'text-foreground'}`}>
+                    中文
+                  </p>
+                  <p className="text-xs text-muted-foreground">Chinese</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setLanguage('en')}
+                className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
+                  language === 'en'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <Globe className={`w-5 h-5 ${language === 'en' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <div className="text-left">
+                  <p className={`text-sm font-medium ${language === 'en' ? 'text-primary' : 'text-foreground'}`}>
+                    English
+                  </p>
+                  <p className="text-xs text-muted-foreground">英文</p>
+                </div>
+              </button>
+            </div>
+          </div>
         </section>
 
         {/* Data Management Section */}
@@ -101,12 +225,14 @@ export default function SettingsPage() {
                 <Building2 className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-foreground">SollAI Invoice</p>
+                <p className="text-sm font-semibold text-foreground">SollAI</p>
                 <p className="text-xs text-muted-foreground">{t('about.version')} 1.0.0</p>
               </div>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              {t('about.description')}
+              {language === 'zh'
+                ? 'AI 驱动的全球达人营销平台，帮助品牌连接全球创作者，实现营销目标。'
+                : 'AI-powered global creator marketing platform, helping brands connect with creators worldwide to achieve marketing goals.'}
             </p>
           </div>
         </section>
