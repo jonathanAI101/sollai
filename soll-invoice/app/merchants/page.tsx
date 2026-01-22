@@ -5,10 +5,9 @@ import { Layout, Header } from '@/components/layout';
 import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
 import { Plus, Search, Filter, Building2, Globe, X, Eye, Trash2, Mail, Phone, Pencil, FileText } from 'lucide-react';
-import { db, type Tables } from '@/lib/supabase/hooks';
+import { db, type Tables, type InvoiceWithRelations } from '@/lib/supabase/hooks';
 
 type Merchant = Tables<'merchants'>;
-type Invoice = Tables<'invoices'>;
 
 export default function MerchantsPage() {
   const { t } = useI18n();
@@ -21,7 +20,7 @@ export default function MerchantsPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingMerchant, setEditingMerchant] = useState<Merchant | null>(null);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Form state
@@ -58,8 +57,8 @@ export default function MerchantsPage() {
     }
   };
 
-  const getInvoiceCount = (merchantName: string) => {
-    return invoices.filter(inv => inv.merchant === merchantName).length;
+  const getInvoiceCount = (merchantId: string) => {
+    return invoices.filter(inv => inv.merchant_id === merchantId).length;
   };
 
   // Filter merchants
@@ -242,7 +241,7 @@ export default function MerchantsPage() {
                   </span>
                   <span className="flex items-center gap-1 text-foreground font-medium">
                       <FileText className="w-3.5 h-3.5" />
-                      {getInvoiceCount(merchant.name)} Invoices
+                      {getInvoiceCount(merchant.id)} Invoices
                     </span>
                 </div>
               </div>
@@ -434,7 +433,7 @@ export default function MerchantsPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Invoices</p>
-                  <p className="text-sm font-medium text-foreground">{getInvoiceCount(selectedMerchant.name)}</p>
+                  <p className="text-sm font-medium text-foreground">{getInvoiceCount(selectedMerchant.id)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">{t('creators.status')}</p>

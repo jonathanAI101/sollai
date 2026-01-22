@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from './client';
-import type { Database } from './types';
+import type { Database, InvoiceWithRelations } from './types';
 
 // Type helpers
 export type Tables<T extends keyof Database['public']['Tables']> =
@@ -11,6 +11,7 @@ export type InsertTables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Insert'];
 export type UpdateTables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Update'];
+export type { InvoiceWithRelations };
 
 // Supabase client singleton
 let supabaseClient: ReturnType<typeof createClient> | null = null;
@@ -191,30 +192,40 @@ export const db = {
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('invoices')
-        .select('*')
+        .select('*, merchants(*), creators(*)')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as Tables<'invoices'>[];
+      return data as InvoiceWithRelations[];
     },
     async getById(id: string) {
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('invoices')
-        .select('*')
+        .select('*, merchants(*), creators(*)')
         .eq('id', id)
         .single();
       if (error) throw error;
-      return data as Tables<'invoices'>;
+      return data as InvoiceWithRelations;
+    },
+    async getByMerchantId(merchantId: string) {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*, merchants(*), creators(*)')
+        .eq('merchant_id', merchantId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as InvoiceWithRelations[];
     },
     async create(invoice: InsertTables<'invoices'>) {
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('invoices')
         .insert(invoice as never)
-        .select()
+        .select('*, merchants(*), creators(*)')
         .single();
       if (error) throw error;
-      return data as Tables<'invoices'>;
+      return data as InvoiceWithRelations;
     },
     async update(id: string, updates: UpdateTables<'invoices'>) {
       const supabase = getSupabase();
@@ -231,6 +242,15 @@ export const db = {
       const supabase = getSupabase();
       const { error } = await supabase.from('invoices').delete().eq('id', id);
       if (error) throw error;
+    },
+    async countByMerchantId(merchantId: string) {
+      const supabase = getSupabase();
+      const { count, error } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('merchant_id', merchantId);
+      if (error) throw error;
+      return count || 0;
     },
   },
 };

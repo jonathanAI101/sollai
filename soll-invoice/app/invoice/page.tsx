@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Layout, Header } from '@/components/layout';
 import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
-import { db, type Tables } from '@/lib/supabase/hooks';
+import { db, type Tables, type InvoiceWithRelations } from '@/lib/supabase/hooks';
 import type { Json } from '@/lib/supabase/types';
 import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Mail } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -29,7 +29,8 @@ type CompanyInfo = {
 
 type Invoice = {
   id: string;
-  merchant: string;
+  merchantId: string | null;
+  merchant: string; // display name (from joined data or snapshot)
   description: string;
   amount: number;
   currency: string;
@@ -85,7 +86,8 @@ export default function InvoicePage() {
 
   // Form state for creating invoice
   const [formData, setFormData] = useState({
-    merchant: '',
+    merchantId: '',
+    merchantName: '',
     description: '',
     currency: 'USD',
     dueDate: '',
@@ -109,9 +111,10 @@ export default function InvoicePage() {
   const [loading, setLoading] = useState(true);
 
   // Convert DB row to local Invoice type
-  const mapDbToInvoice = (row: Tables<'invoices'>): Invoice => ({
+  const mapDbToInvoice = (row: InvoiceWithRelations): Invoice => ({
     id: row.id,
-    merchant: row.merchant,
+    merchantId: row.merchant_id,
+    merchant: row.merchants?.name || row.merchant_name_snapshot,
     description: row.description,
     amount: row.amount,
     currency: row.currency,
@@ -431,14 +434,15 @@ export default function InvoicePage() {
   };
 
   const handleCreateInvoice = async () => {
-    if (!formData.merchant || lineItems.every(item => !item.description)) return;
+    if (!formData.merchantId || lineItems.every(item => !item.description)) return;
 
     const total = calculateTotal();
     const validItems = lineItems.filter(item => item.description);
 
     try {
       await db.invoices.create({
-        merchant: formData.merchant,
+        merchant_id: formData.merchantId,
+        merchant_name_snapshot: formData.merchantName,
         description: validItems[0]?.description || 'Marketing services',
         amount: total,
         currency: formData.currency,
@@ -448,7 +452,7 @@ export default function InvoicePage() {
         items: validItems as unknown as Json,
         from_company: defaultFromCompany as unknown as Json,
         to_company: {
-          name: formData.toCompanyName || formData.merchant,
+          name: formData.toCompanyName || formData.merchantName,
           address: formData.toCompanyAddress || '',
           city: formData.toCompanyCity || '',
           country: formData.toCompanyCountry || 'United States',
@@ -463,7 +467,7 @@ export default function InvoicePage() {
 
       await fetchInvoices();
       setShowCreateModal(false);
-      setFormData({ merchant: '', description: '', currency: 'USD', dueDate: '', notes: '', toCompanyName: '', toCompanyAddress: '', toCompanyCity: '', toCompanyCountry: '', toCompanyEmail: '' });
+      setFormData({ merchantId: '', merchantName: '', description: '', currency: 'USD', dueDate: '', notes: '', toCompanyName: '', toCompanyAddress: '', toCompanyCity: '', toCompanyCountry: '', toCompanyEmail: '' });
       setLineItems([{ description: '', quantity: 1, rate: 0, amount: 0 }]);
     } catch (e) {
       console.error('Failed to create invoice:', e);
@@ -807,13 +811,14 @@ export default function InvoicePage() {
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">{t('invoice.merchant')} *</label>
                     <select
-                      value={formData.merchant}
+                      value={formData.merchantId}
                       onChange={(e) => {
-                        const selected = merchants.find(m => m.name === e.target.value);
+                        const selected = merchants.find(m => m.id === e.target.value);
                         setFormData({
                           ...formData,
-                          merchant: e.target.value,
-                          toCompanyName: e.target.value,
+                          merchantId: e.target.value,
+                          merchantName: selected?.name || '',
+                          toCompanyName: selected?.name || '',
                           toCompanyAddress: selected?.address || '',
                           toCompanyCity: selected?.city || '',
                           toCompanyEmail: selected?.email || '',
@@ -823,7 +828,7 @@ export default function InvoicePage() {
                     >
                       <option value="">{t('invoice.selectMerchant')}</option>
                       {merchants.map((m) => (
-                        <option key={m.id} value={m.name}>{m.name}</option>
+                        <option key={m.id} value={m.id}>{m.name}</option>
                       ))}
                     </select>
                   </div>
@@ -971,7 +976,7 @@ export default function InvoicePage() {
                   {/* To Section */}
                   <div className="mt-3">
                     <p className="text-[8px] font-bold text-gray-400">To</p>
-                    <p className="text-[10px] font-bold mt-0.5">{formData.merchant || '—'}</p>
+                    <p className="text-[10px] font-bold mt-0.5">{formData.merchantName || '—'}</p>
                     <p className="text-[8px] text-[#333]">{formData.toCompanyAddress || ''}</p>
                     <p className="text-[8px] text-[#333]">{formData.toCompanyCity || ''}</p>
                     <p className="text-[8px] text-[#333]">{formData.toCompanyCountry || 'United States'}</p>

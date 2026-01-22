@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Layout, Header } from '@/components/layout';
 import { useI18n } from '@/lib/i18n';
-import { db, Tables } from '@/lib/supabase/hooks';
+import { db, Tables, InvoiceWithRelations } from '@/lib/supabase/hooks';
 import { Users, Store, FileText, Wallet, TrendingUp, Calendar, CheckCircle, Clock, XCircle, Loader2 } from 'lucide-react';
 
 function formatInvoiceId(id: string) {
@@ -14,7 +14,7 @@ export default function DashboardPage() {
   const { t } = useI18n();
   const [creators, setCreators] = useState<Tables<'creators'>[]>([]);
   const [merchants, setMerchants] = useState<Tables<'merchants'>[]>([]);
-  const [invoices, setInvoices] = useState<Tables<'invoices'>[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function DashboardPage() {
                       {getStatusIcon(invoice.status || 'draft')}
                       <div>
                         <p className="text-sm font-medium text-foreground">{formatInvoiceId(invoice.id)}</p>
-                        <p className="text-xs text-muted-foreground">{invoice.merchant || 'Unknown'} - {invoice.description || 'No description'}</p>
+                        <p className="text-xs text-muted-foreground">{invoice.merchants?.name || invoice.merchant_name_snapshot || 'Unknown'} - {invoice.description || 'No description'}</p>
                       </div>
                     </div>
                     <span className="text-sm font-medium text-foreground">${(invoice.amount || 0).toLocaleString()}</span>
@@ -145,7 +145,7 @@ export default function DashboardPage() {
                         <p className="text-sm font-medium text-foreground">
                           {formatInvoiceId(invoice.id)} {isOverdue ? t('invoice.status.overdue') : t('invoice.dueDate')}
                         </p>
-                        <p className="text-xs text-muted-foreground">{invoice.merchant || 'Unknown'} - ${(invoice.amount || 0).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{invoice.merchants?.name || invoice.merchant_name_snapshot || 'Unknown'} - ${(invoice.amount || 0).toLocaleString()}</p>
                       </div>
                     </div>
                   );

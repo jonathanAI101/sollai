@@ -111,7 +111,9 @@ export type Database = {
       invoices: {
         Row: {
           id: string;
-          merchant: string;
+          merchant_id: string | null;
+          creator_id: string | null;
+          merchant_name_snapshot: string;
           description: string;
           amount: number;
           currency: string;
@@ -128,7 +130,9 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          merchant: string;
+          merchant_id?: string | null;
+          creator_id?: string | null;
+          merchant_name_snapshot: string;
           description?: string;
           amount: number;
           currency?: string;
@@ -145,7 +149,9 @@ export type Database = {
         };
         Update: {
           id?: string;
-          merchant?: string;
+          merchant_id?: string | null;
+          creator_id?: string | null;
+          merchant_name_snapshot?: string;
           description?: string;
           amount?: number;
           currency?: string;
@@ -181,3 +187,9 @@ export type InsertTables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Insert'];
 export type UpdateTables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Update'];
+
+// Invoice with expanded merchant/creator data (from JOIN queries)
+export type InvoiceWithRelations = Tables<'invoices'> & {
+  merchants: Tables<'merchants'> | null;
+  creators: Tables<'creators'> | null;
+};
