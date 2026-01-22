@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { FileText, Users, Package, Clock, Settings } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { ThemeLanguageToggle } from './ThemeLanguageToggle';
+import { LogoModern } from '@/components/ui/Logo';
 
 const navItems = [
   { href: '/invoice', labelKey: 'nav.invoice', icon: FileText },
@@ -23,11 +24,8 @@ export function Sidebar() {
       <div className="flex flex-col flex-1 min-h-0">
         {/* Logo & Toggle */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-border">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <FileText className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-foreground">SollAI</span>
+          <Link href="/">
+            <LogoModern size="md" />
           </Link>
           <ThemeLanguageToggle />
         </div>

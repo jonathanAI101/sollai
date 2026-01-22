@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { FileText, Zap, Shield, Globe, ArrowRight, Check } from 'lucide-react';
+import { Zap, Shield, Globe, ArrowRight, Check } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { ThemeLanguageToggle } from '@/components/layout';
+import { LogoModern } from '@/components/ui/Logo';
 
 export default function LandingPage() {
   const { t } = useI18n();
@@ -13,11 +14,8 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <FileText className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-foreground">SollAI</span>
+          <Link href="/">
+            <LogoModern size="md" />
           </Link>
           <div className="flex items-center gap-4">
             <ThemeLanguageToggle />
@@ -219,10 +217,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-border">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <FileText className="w-4 h-4" />
-            <span>SollAI</span>
-          </div>
+          <LogoModern size="sm" />
           <p className="text-xs text-muted-foreground">
             {t('landing.footer.privacy')}
           </p>
