@@ -117,6 +117,7 @@ export type Database = {
       invoices: {
         Row: {
           id: string;
+          invoice_number: string | null;
           merchant_id: string | null;
           creator_id: string | null;
           merchant_name_snapshot: string;
@@ -138,6 +139,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          invoice_number?: string | null;
           merchant_id?: string | null;
           creator_id?: string | null;
           merchant_name_snapshot: string;
@@ -159,6 +161,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          invoice_number?: string | null;
           merchant_id?: string | null;
           creator_id?: string | null;
           merchant_name_snapshot?: string;

@@ -1,11 +1,28 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Layout, Header } from '@/components/layout';
-import { Download, Upload, Building2, Globe } from 'lucide-react';
+import { Download, Upload, Building2, Globe, FileText } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import { db } from '@/lib/supabase/hooks';
 
 export default function SettingsPage() {
   const { t, language, setLanguage } = useI18n();
+  const [invoicePrefix, setInvoicePrefix] = useState('INV');
+  const [invoicePadding, setInvoicePadding] = useState(4);
+  const [invoiceFormat, setInvoiceFormat] = useState('{prefix}-{year}-{number}');
+  const [previewNumber, setPreviewNumber] = useState('');
+
+  useEffect(() => {
+    db.invoices.previewNextNumber(invoicePrefix)
+      .then(setPreviewNumber)
+      .catch(() => {
+        // Generate local preview if DB not ready
+        const year = new Date().getFullYear();
+        const num = '1'.padStart(invoicePadding, '0');
+        setPreviewNumber(invoiceFormat.replace('{prefix}', invoicePrefix).replace('{year}', String(year)).replace('{number}', num));
+      });
+  }, [invoicePrefix, invoicePadding, invoiceFormat]);
 
   const handleExport = async () => {
     try {
@@ -98,6 +115,69 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">英文</p>
                 </div>
               </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Invoice Number Settings */}
+        <section>
+          <h2 className="text-base font-semibold text-foreground mb-4">
+            {language === 'zh' ? '发票编号格式' : 'Invoice Number Format'}
+          </h2>
+          <div className="bg-card rounded-lg border border-border p-4 space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  {language === 'zh' ? '前缀' : 'Prefix'}
+                </label>
+                <input
+                  type="text"
+                  value={invoicePrefix}
+                  onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase())}
+                  maxLength={10}
+                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="INV"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  {language === 'zh' ? '编号位数' : 'Padding'}
+                </label>
+                <select
+                  value={invoicePadding}
+                  onChange={(e) => setInvoicePadding(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value={3}>3 (001)</option>
+                  <option value={4}>4 (0001)</option>
+                  <option value={5}>5 (00001)</option>
+                  <option value={6}>6 (000001)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  {language === 'zh' ? '格式' : 'Format'}
+                </label>
+                <select
+                  value={invoiceFormat}
+                  onChange={(e) => setInvoiceFormat(e.target.value)}
+                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="{prefix}-{year}-{number}">{invoicePrefix}-2026-0001</option>
+                  <option value="{prefix}{year}{number}">{invoicePrefix}20260001</option>
+                  <option value="{prefix}-{number}">{invoicePrefix}-0001</option>
+                  <option value="{year}-{prefix}-{number}">2026-{invoicePrefix}-0001</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg">
+              <FileText className="w-4 h-4 text-primary shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {language === 'zh' ? '下一个发票编号预览' : 'Next invoice number preview'}
+                </p>
+                <p className="text-sm font-mono font-medium text-foreground">{previewNumber}</p>
+              </div>
             </div>
           </div>
         </section>

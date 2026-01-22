@@ -6,7 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
 import { db, type Tables, type InvoiceWithRelations } from '@/lib/supabase/hooks';
 import type { Json } from '@/lib/supabase/types';
-import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Mail, Ban, History } from 'lucide-react';
+import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Mail, Ban, History, Pencil } from 'lucide-react';
 import { InvoiceHistory } from '@/components/invoice/InvoiceHistory';
 import { jsPDF } from 'jspdf';
 
@@ -30,6 +30,7 @@ type CompanyInfo = {
 
 type Invoice = {
   id: string;
+  invoiceNumber: string | null;
   merchantId: string | null;
   merchant: string; // display name (from joined data or snapshot)
   description: string;
@@ -67,6 +68,9 @@ export default function InvoicePage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [previewNumber, setPreviewNumber] = useState<string>('');
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [emailTarget, setEmailTarget] = useState<{ invoice: Invoice; email: string } | null>(null);
 
   // Click-outside to close menus
@@ -115,6 +119,7 @@ export default function InvoicePage() {
   // Convert DB row to local Invoice type
   const mapDbToInvoice = (row: InvoiceWithRelations): Invoice => ({
     id: row.id,
+    invoiceNumber: row.invoice_number,
     merchantId: row.merchant_id,
     merchant: row.merchants?.name || row.merchant_name_snapshot,
     description: row.description,
@@ -152,6 +157,13 @@ export default function InvoicePage() {
     db.merchants.getAll().then(setMerchants).catch(console.error);
     fetchInvoices();
   }, []);
+
+  // Fetch preview invoice number when create modal opens
+  useEffect(() => {
+    if (showCreateModal) {
+      db.invoices.previewNextNumber().then(setPreviewNumber).catch(() => setPreviewNumber(''));
+    }
+  }, [showCreateModal]);
 
   // Filter invoices
   const filteredInvoices = invoices.filter(invoice => {
@@ -307,7 +319,7 @@ export default function InvoicePage() {
     doc.text('Invoice No.', detailsX, detailsY);
     doc.setTextColor(...textColor);
     doc.setFont('helvetica', 'bold');
-    doc.text(formatInvoiceId(invoice.id), detailsX + 35, detailsY);
+    doc.text(invoice.invoiceNumber || formatInvoiceId(invoice.id), detailsX + 35, detailsY);
     detailsY += 6;
 
     doc.setFont('helvetica', 'normal');
@@ -435,53 +447,112 @@ export default function InvoicePage() {
   const generatePDF = (invoice: Invoice) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     buildPdfContent(doc, invoice);
-    doc.save(`${formatInvoiceId(invoice.id)}.pdf`);
+    doc.save(`${invoice.invoiceNumber || formatInvoiceId(invoice.id)}.pdf`);
   };
 
-  const handleCreateInvoice = async () => {
+  const handleCloseModal = () => {
+    setShowCreateModal(false);
+    setIsEditMode(false);
+    setEditingInvoice(null);
+    setFormData({ merchantId: '', merchantName: '', description: '', currency: 'USD', dueDate: '', notes: '', toCompanyName: '', toCompanyAddress: '', toCompanyCity: '', toCompanyCountry: '', toCompanyEmail: '' });
+    setLineItems([{ description: '', quantity: 1, rate: 0, amount: 0 }]);
+  };
+
+  const handleEditInvoice = (invoice: Invoice) => {
+    if (invoice.status !== 'draft') {
+      alert(language === 'zh'
+        ? '只有草稿状态的发票可以编辑'
+        : 'Only draft invoices can be edited');
+      return;
+    }
+
+    setFormData({
+      merchantId: invoice.merchantId || '',
+      merchantName: invoice.merchant,
+      description: invoice.description,
+      currency: invoice.currency,
+      dueDate: invoice.dueDate,
+      notes: invoice.notes,
+      toCompanyName: invoice.toCompany.name,
+      toCompanyAddress: invoice.toCompany.address,
+      toCompanyCity: invoice.toCompany.city,
+      toCompanyCountry: invoice.toCompany.country,
+      toCompanyEmail: invoice.toCompany.email,
+    });
+    setLineItems(invoice.items.length > 0 ? [...invoice.items] : [{ description: '', quantity: 1, rate: 0, amount: 0 }]);
+
+    setEditingInvoice(invoice);
+    setIsEditMode(true);
+    setShowCreateModal(true);
+    setShowDetailModal(false);
+  };
+
+  const handleSaveInvoice = async () => {
     if (!formData.merchantId || lineItems.every(item => !item.description)) return;
 
     const total = calculateTotal();
     const validItems = lineItems.filter(item => item.description);
 
-    try {
-      const newInvoice = await db.invoices.create({
-        merchant_id: formData.merchantId,
-        merchant_name_snapshot: formData.merchantName,
-        description: validItems[0]?.description || 'Marketing services',
-        amount: total,
-        currency: formData.currency,
-        issue_date: new Date().toISOString().split('T')[0],
-        due_date: formData.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        status: 'draft',
-        items: validItems as unknown as Json,
-        from_company: defaultFromCompany as unknown as Json,
-        to_company: {
-          name: formData.toCompanyName || formData.merchantName,
-          address: formData.toCompanyAddress || '',
-          city: formData.toCompanyCity || '',
-          country: formData.toCompanyCountry || 'United States',
-          email: formData.toCompanyEmail || '',
-          phone: '',
-          bankName: '',
-          bankAccount: '',
-        } as unknown as Json,
-        paid_to_date: 0,
-        notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
-      });
+    const toCompany = {
+      name: formData.toCompanyName || formData.merchantName,
+      address: formData.toCompanyAddress || '',
+      city: formData.toCompanyCity || '',
+      country: formData.toCompanyCountry || 'United States',
+      email: formData.toCompanyEmail || '',
+      phone: '',
+      bankName: '',
+      bankAccount: '',
+    };
 
-      await db.invoiceAudit.log({
-        invoice_id: newInvoice.id,
-        action: 'created',
-        new_value: { amount: total, merchant: formData.merchantName, status: 'draft' },
-      });
+    try {
+      if (isEditMode && editingInvoice) {
+        await db.invoices.update(editingInvoice.id, {
+          merchant_id: formData.merchantId,
+          merchant_name_snapshot: formData.merchantName,
+          description: validItems[0]?.description || 'Marketing services',
+          amount: total,
+          currency: formData.currency,
+          due_date: formData.dueDate || null,
+          items: validItems as unknown as Json,
+          to_company: toCompany as unknown as Json,
+          notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
+        });
+
+        await db.invoiceAudit.log({
+          invoice_id: editingInvoice.id,
+          action: 'updated',
+          old_value: { amount: editingInvoice.amount, merchant: editingInvoice.merchant },
+          new_value: { amount: total, merchant: formData.merchantName },
+        });
+      } else {
+        const newInvoice = await db.invoices.create({
+          merchant_id: formData.merchantId,
+          merchant_name_snapshot: formData.merchantName,
+          description: validItems[0]?.description || 'Marketing services',
+          amount: total,
+          currency: formData.currency,
+          issue_date: new Date().toISOString().split('T')[0],
+          due_date: formData.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          status: 'draft',
+          items: validItems as unknown as Json,
+          from_company: defaultFromCompany as unknown as Json,
+          to_company: toCompany as unknown as Json,
+          paid_to_date: 0,
+          notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
+        });
+
+        await db.invoiceAudit.log({
+          invoice_id: newInvoice.id,
+          action: 'created',
+          new_value: { amount: total, merchant: formData.merchantName, status: 'draft' },
+        });
+      }
 
       await fetchInvoices();
-      setShowCreateModal(false);
-      setFormData({ merchantId: '', merchantName: '', description: '', currency: 'USD', dueDate: '', notes: '', toCompanyName: '', toCompanyAddress: '', toCompanyCity: '', toCompanyCountry: '', toCompanyEmail: '' });
-      setLineItems([{ description: '', quantity: 1, rate: 0, amount: 0 }]);
+      handleCloseModal();
     } catch (e) {
-      console.error('Failed to create invoice:', e);
+      console.error('Failed to save invoice:', e);
+      alert(language === 'zh' ? '保存失败' : 'Failed to save');
     }
   };
 
@@ -520,10 +591,11 @@ export default function InvoicePage() {
       const pdfBase64 = doc.output('datauristring').split(',')[1];
 
       const itemsList = invoice.items.map(item => `  - ${item.description}: $${item.amount.toLocaleString()}`).join('\n');
-      const subject = `Invoice ${formatInvoiceId(invoice.id)} from ${defaultFromCompany.name}`;
+      const invoiceNum = invoice.invoiceNumber || formatInvoiceId(invoice.id);
+      const subject = `Invoice ${invoiceNum} from ${defaultFromCompany.name}`;
       const body =
         `Dear ${invoice.toCompany.name || invoice.merchant},\n\n` +
-        `Please find attached Invoice ${formatInvoiceId(invoice.id)}.\n\n` +
+        `Please find attached Invoice ${invoiceNum}.\n\n` +
         `Invoice Date: ${invoice.issueDate}\n` +
         `Due Date: ${invoice.dueDate}\n` +
         `Currency: ${invoice.currency}\n\n` +
@@ -539,7 +611,7 @@ export default function InvoicePage() {
       const res = await fetch('/api/send-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: email, subject, body, pdfBase64, invoiceId: formatInvoiceId(invoice.id) }),
+        body: JSON.stringify({ to: email, subject, body, pdfBase64, invoiceId: invoiceNum }),
       });
 
       const data = await res.json();
@@ -572,7 +644,7 @@ export default function InvoicePage() {
     const csvContent = [
       ['Invoice No', 'Merchant', 'Description', 'Amount', 'Currency', 'Issue Date', 'Due Date', 'Status'],
       ...filteredInvoices.map(inv => [
-        escapeCsv(formatInvoiceId(inv.id)), escapeCsv(inv.merchant), escapeCsv(inv.description),
+        escapeCsv(inv.invoiceNumber || formatInvoiceId(inv.id)), escapeCsv(inv.merchant), escapeCsv(inv.description),
         inv.amount, inv.currency, inv.issueDate, inv.dueDate, inv.status
       ])
     ].map(row => row.join(',')).join('\n');
@@ -603,8 +675,8 @@ export default function InvoicePage() {
     if (invoice?.status !== 'draft') {
       const confirmed = window.confirm(
         language === 'zh'
-          ? `确定要删除发票 ${formatInvoiceId(id)}？此操作不可撤销。`
-          : `Are you sure you want to delete invoice ${formatInvoiceId(id)}? This cannot be undone.`
+          ? `确定要删除发票 ${invoice?.invoiceNumber || formatInvoiceId(id)}？此操作不可撤销。`
+          : `Are you sure you want to delete invoice ${invoice?.invoiceNumber || formatInvoiceId(id)}? This cannot be undone.`
       );
       if (!confirmed) return;
     }
@@ -774,7 +846,7 @@ export default function InvoicePage() {
                 {!loading && filteredInvoices.map((invoice) => (
                   <tr key={invoice.id} className="hover:bg-secondary/30 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-mono text-sm font-medium text-primary">{formatInvoiceId(invoice.id)}</span>
+                      <span className="font-mono text-sm font-medium text-primary">{invoice.invoiceNumber || formatInvoiceId(invoice.id)}</span>
                     </td>
                     <td className="px-4 py-3 text-sm text-foreground">{invoice.merchant}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{invoice.description}</td>
@@ -797,6 +869,15 @@ export default function InvoicePage() {
                         >
                           <Eye className="w-4 h-4 text-muted-foreground" />
                         </button>
+                        {invoice.status === 'draft' && (
+                          <button
+                            onClick={() => handleEditInvoice(invoice)}
+                            className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                            title={language === 'zh' ? '编辑' : 'Edit'}
+                          >
+                            <Pencil className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDownloadInvoice(invoice)}
                           className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
@@ -900,17 +981,28 @@ export default function InvoicePage() {
       {/* Create Invoice Slide-out Panel */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateModal(false)} />
+          <div className="absolute inset-0 bg-black/40" onClick={handleCloseModal} />
           <div className="relative ml-auto w-full max-w-5xl bg-card border-l border-border shadow-2xl flex flex-col transition-transform duration-300">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-              <h2 className="text-lg font-semibold text-foreground">{t('invoice.create')}</h2>
+              <h2 className="text-lg font-semibold text-foreground">
+                {isEditMode
+                  ? (language === 'zh' ? '编辑发票' : 'Edit Invoice')
+                  : t('invoice.create')}
+                {isEditMode && editingInvoice && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    {editingInvoice.invoiceNumber || formatInvoiceId(editingInvoice.id)}
+                  </span>
+                )}
+              </h2>
               <div className="flex items-center gap-3">
-                <Button variant="outline" size="sm" onClick={() => setShowCreateModal(false)}>
+                <Button variant="outline" size="sm" onClick={handleCloseModal}>
                   {t('common.cancel')}
                 </Button>
-                <Button size="sm" onClick={handleCreateInvoice}>
-                  {t('invoice.submit')}
+                <Button size="sm" onClick={handleSaveInvoice}>
+                  {isEditMode
+                    ? (language === 'zh' ? '保存更改' : 'Save Changes')
+                    : t('invoice.submit')}
                 </Button>
               </div>
             </div>
@@ -1059,6 +1151,11 @@ export default function InvoicePage() {
               {/* Right: Live Preview (matches PDF output) */}
               <div className="w-1/2 overflow-y-auto p-6 bg-secondary/30 flex items-start justify-center">
                 <div className="bg-white rounded-sm shadow-lg w-full max-w-[420px] aspect-[210/297] p-8 relative flex flex-col text-[#333]" style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}>
+                  {isEditMode && (
+                    <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
+                      {language === 'zh' ? '编辑模式' : 'Editing'}
+                    </div>
+                  )}
                   {/* Invoice Title */}
                   <h1 className="text-[24px] font-bold" style={{ color: 'rgb(41, 98, 255)' }}>Invoice</h1>
 
@@ -1066,7 +1163,7 @@ export default function InvoicePage() {
                   <div className="absolute top-8 right-8 text-[8px] space-y-1">
                     <div className="flex gap-4">
                       <span className="text-gray-400">Invoice No.</span>
-                      <span className="font-bold text-[#333]">INV-NEW</span>
+                      <span className="font-bold text-[#333]">{isEditMode ? (editingInvoice?.invoiceNumber || editingInvoice?.id?.slice(0, 8)) : (previewNumber || 'INV-NEW')}</span>
                     </div>
                     <div className="flex gap-4">
                       <span className="text-gray-400">Date</span>
@@ -1173,7 +1270,7 @@ export default function InvoicePage() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowDetailModal(false)} />
           <div className="relative bg-card border border-border rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">{formatInvoiceId(selectedInvoice.id)}</h2>
+              <h2 className="text-lg font-semibold text-foreground">{selectedInvoice.invoiceNumber || formatInvoiceId(selectedInvoice.id)}</h2>
               <button onClick={() => setShowDetailModal(false)} className="p-1.5 hover:bg-secondary rounded-lg transition-colors">
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
@@ -1279,6 +1376,12 @@ export default function InvoicePage() {
               </div>
             </div>
             <div className="flex gap-3 p-4 border-t border-border">
+              {selectedInvoice.status === 'draft' && (
+                <Button variant="outline" className="flex-1" onClick={() => handleEditInvoice(selectedInvoice)}>
+                  <Pencil className="w-4 h-4" />
+                  {language === 'zh' ? '编辑' : 'Edit'}
+                </Button>
+              )}
               <Button variant="outline" className="flex-1" onClick={() => handleDownloadInvoice(selectedInvoice)}>
                 <Download className="w-4 h-4" />
                 {language === 'zh' ? '下载' : 'PDF'}
@@ -1342,8 +1445,8 @@ export default function InvoicePage() {
               )}
               <p className="text-xs text-muted-foreground">
                 {language === 'zh'
-                  ? `将发送 ${formatInvoiceId(emailTarget.invoice.id)} 的 PDF 附件`
-                  : `Will send ${formatInvoiceId(emailTarget.invoice.id)} with PDF attached`}
+                  ? `将发送 ${emailTarget.invoice.invoiceNumber || formatInvoiceId(emailTarget.invoice.id)} 的 PDF 附件`
+                  : `Will send ${emailTarget.invoice.invoiceNumber || formatInvoiceId(emailTarget.invoice.id)} with PDF attached`}
               </p>
             </div>
             <div className="flex gap-3 p-4 border-t border-border">

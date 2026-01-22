@@ -235,11 +235,31 @@ export const db = {
       if (error) throw error;
       return data as InvoiceWithRelations[];
     },
+    async getNextNumber(prefix = 'INV'): Promise<string> {
+      const supabase = getSupabase();
+      const { data, error } = await (supabase.rpc as CallableFunction)('get_next_invoice_number', {
+        p_user_id: null,
+        p_prefix: prefix,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    async previewNextNumber(prefix = 'INV'): Promise<string> {
+      const supabase = getSupabase();
+      const { data, error } = await (supabase.rpc as CallableFunction)('preview_next_invoice_number', {
+        p_user_id: null,
+        p_prefix: prefix,
+      });
+      if (error) throw error;
+      return data as string;
+    },
     async create(invoice: InsertTables<'invoices'>) {
       const supabase = getSupabase();
+      // Auto-assign invoice number
+      const invoiceNumber = await db.invoices.getNextNumber();
       const { data, error } = await supabase
         .from('invoices')
-        .insert(invoice as never)
+        .insert({ ...invoice, invoice_number: invoiceNumber } as never)
         .select('*, merchants(*), creators(*)')
         .single();
       if (error) throw error;
