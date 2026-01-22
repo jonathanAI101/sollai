@@ -8,6 +8,7 @@ import { db, type Tables, type InvoiceWithRelations } from '@/lib/supabase/hooks
 import type { Json } from '@/lib/supabase/types';
 import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Mail, Ban, History, Pencil } from 'lucide-react';
 import { InvoiceHistory } from '@/components/invoice/InvoiceHistory';
+import { FROM_COMPANIES, DEFAULT_FROM_COMPANY, getCompanyById, formatCompanyAddress } from '@/lib/invoice/companies';
 import { jsPDF } from 'jspdf';
 
 type InvoiceItem = {
@@ -18,6 +19,7 @@ type InvoiceItem = {
 };
 
 type CompanyInfo = {
+  id?: string;
   name: string;
   address: string;
   city: string;
@@ -28,6 +30,9 @@ type CompanyInfo = {
   phone: string;
   bankName: string;
   bankAccount: string;
+  bankRouting?: string;
+  swiftCode?: string;
+  taxId?: string;
 };
 
 type Invoice = {
@@ -51,19 +56,23 @@ type Invoice = {
   subtotal: number;
 };
 
-// Default company info
-const defaultFromCompany: CompanyInfo = {
-  name: 'SollAI Inc.',
-  address: '123 Innovation Drive, Suite 100',
-  city: 'San Francisco',
-  state: 'CA',
-  postalCode: '94105',
-  country: 'United States',
-  email: 'billing@sollai.com',
-  phone: '+1 (555) 123-4567',
-  bankName: 'First National Bank',
-  bankAccount: '1234567890',
-};
+// Convert FromCompany config to CompanyInfo for invoice storage
+const fromCompanyToCompanyInfo = (fc: typeof DEFAULT_FROM_COMPANY): CompanyInfo => ({
+  id: fc.id,
+  name: fc.legalName || fc.name,
+  address: fc.address,
+  city: fc.city,
+  state: fc.state || '',
+  postalCode: fc.postalCode,
+  country: fc.country,
+  email: fc.email,
+  phone: fc.phone || '',
+  bankName: fc.bankName,
+  bankAccount: fc.bankAccount,
+  bankRouting: fc.bankRouting,
+  swiftCode: fc.swiftCode,
+  taxId: fc.taxId,
+});
 
 export default function InvoicePage() {
   const { t, language } = useI18n();
@@ -99,6 +108,7 @@ export default function InvoicePage() {
 
   // Form state for creating invoice
   const [formData, setFormData] = useState({
+    fromCompanyId: DEFAULT_FROM_COMPANY.id,
     merchantId: '',
     merchantName: '',
     description: '',
@@ -116,6 +126,9 @@ export default function InvoicePage() {
     taxRate: 0,
   });
 
+  // Get currently selected From company
+  const selectedFromCompany = getCompanyById(formData.fromCompanyId) || DEFAULT_FROM_COMPANY;
+
   // Line items for new invoice
   const [lineItems, setLineItems] = useState<InvoiceItem[]>([
     { description: '', quantity: 1, rate: 0, amount: 0 }
@@ -130,6 +143,7 @@ export default function InvoicePage() {
   // Convert DB row to local Invoice type
   const mapDbToInvoice = (row: InvoiceWithRelations): Invoice => {
     const toCompany = row.to_company as Record<string, string> | null;
+    const fromCompany = row.from_company as Record<string, string> | null;
     return {
       id: row.id,
       invoiceNumber: row.invoice_number,
@@ -142,7 +156,22 @@ export default function InvoicePage() {
       dueDate: row.due_date || '',
       status: row.status as Invoice['status'],
       items: (row.items as InvoiceItem[]) || [],
-      fromCompany: (row.from_company as CompanyInfo) || defaultFromCompany,
+      fromCompany: {
+        id: fromCompany?.id || DEFAULT_FROM_COMPANY.id,
+        name: fromCompany?.name || DEFAULT_FROM_COMPANY.legalName || DEFAULT_FROM_COMPANY.name,
+        address: fromCompany?.address || DEFAULT_FROM_COMPANY.address,
+        city: fromCompany?.city || DEFAULT_FROM_COMPANY.city,
+        state: fromCompany?.state || DEFAULT_FROM_COMPANY.state || '',
+        postalCode: fromCompany?.postalCode || DEFAULT_FROM_COMPANY.postalCode,
+        country: fromCompany?.country || DEFAULT_FROM_COMPANY.country,
+        email: fromCompany?.email || DEFAULT_FROM_COMPANY.email,
+        phone: fromCompany?.phone || DEFAULT_FROM_COMPANY.phone || '',
+        bankName: fromCompany?.bankName || DEFAULT_FROM_COMPANY.bankName,
+        bankAccount: fromCompany?.bankAccount || DEFAULT_FROM_COMPANY.bankAccount,
+        bankRouting: fromCompany?.bankRouting,
+        swiftCode: fromCompany?.swiftCode,
+        taxId: fromCompany?.taxId,
+      },
       toCompany: {
         name: toCompany?.name || '',
         address: toCompany?.address || '',
@@ -333,6 +362,12 @@ export default function InvoicePage() {
     doc.text(fromCityLine || invoice.fromCompany.city, margin, y);
     y += 4;
     doc.text(invoice.fromCompany.country, margin, y);
+    if (invoice.fromCompany.taxId) {
+      y += 4;
+      doc.setTextColor(...mutedColor);
+      doc.text(`Tax ID: ${invoice.fromCompany.taxId}`, margin, y);
+      doc.setTextColor(...textColor);
+    }
     y += 10;
 
     // To Section
@@ -476,8 +511,9 @@ export default function InvoicePage() {
     y += 20;
 
     // Invoice Note section
+    const extraBankLines = (invoice.fromCompany.swiftCode ? 1 : 0) + (invoice.fromCompany.bankRouting ? 1 : 0);
     doc.setFillColor(...lightGray);
-    doc.rect(margin, y - 5, pageWidth - margin * 2, 35, 'F');
+    doc.rect(margin, y - 5, pageWidth - margin * 2, 35 + extraBankLines * 4, 'F');
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -499,6 +535,14 @@ export default function InvoicePage() {
     doc.text(`Bank: ${invoice.fromCompany.bankName}`, margin + 5, y);
     y += 4;
     doc.text(`Account: ${invoice.fromCompany.bankAccount}`, margin + 5, y);
+    if (invoice.fromCompany.swiftCode) {
+      y += 4;
+      doc.text(`SWIFT: ${invoice.fromCompany.swiftCode}`, margin + 5, y);
+    }
+    if (invoice.fromCompany.bankRouting) {
+      y += 4;
+      doc.text(`Routing: ${invoice.fromCompany.bankRouting}`, margin + 5, y);
+    }
 
     // Footer
     const footerY = doc.internal.pageSize.getHeight() - 15;
@@ -523,6 +567,7 @@ export default function InvoicePage() {
     setIsEditMode(false);
     setEditingInvoice(null);
     setFormData({
+      fromCompanyId: DEFAULT_FROM_COMPANY.id,
       merchantId: '', merchantName: '', description: '', currency: 'USD',
       dueDate: '', issueDate: new Date().toISOString().split('T')[0], notes: '',
       toCompanyName: '', toCompanyEmail: '', toCompanyAddress: '',
@@ -540,7 +585,12 @@ export default function InvoicePage() {
       return;
     }
 
+    const fromCompanyId = invoice.fromCompany?.id ||
+      FROM_COMPANIES.find(c => c.name === invoice.fromCompany?.name || c.legalName === invoice.fromCompany?.name)?.id ||
+      DEFAULT_FROM_COMPANY.id;
+
     setFormData({
+      fromCompanyId,
       merchantId: invoice.merchantId || '',
       merchantName: invoice.merchant,
       description: invoice.description,
@@ -573,6 +623,7 @@ export default function InvoicePage() {
     const total = calculateTotal();
     const validItems = lineItems.filter(item => item.description);
 
+    const fromCompanyData = fromCompanyToCompanyInfo(selectedFromCompany);
     const toCompany = {
       name: formData.toCompanyName || formData.merchantName,
       email: formData.toCompanyEmail || '',
@@ -597,6 +648,7 @@ export default function InvoicePage() {
           issue_date: formData.issueDate || new Date().toISOString().split('T')[0],
           due_date: formData.dueDate || null,
           items: validItems as unknown as Json,
+          from_company: fromCompanyData as unknown as Json,
           to_company: toCompany as unknown as Json,
           notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
         } as Record<string, unknown> as never);
@@ -605,7 +657,7 @@ export default function InvoicePage() {
           invoice_id: editingInvoice.id,
           action: 'updated',
           old_value: { amount: editingInvoice.amount, merchant: editingInvoice.merchant },
-          new_value: { amount: total, merchant: formData.merchantName, taxRate: formData.taxRate },
+          new_value: { amount: total, merchant: formData.merchantName, fromCompany: selectedFromCompany.name },
         });
       } else {
         const newInvoice = await db.invoices.create({
@@ -618,7 +670,7 @@ export default function InvoicePage() {
           due_date: formData.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           status: 'draft',
           items: validItems as unknown as Json,
-          from_company: defaultFromCompany as unknown as Json,
+          from_company: fromCompanyData as unknown as Json,
           to_company: toCompany as unknown as Json,
           paid_to_date: 0,
           notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
@@ -627,7 +679,7 @@ export default function InvoicePage() {
         await db.invoiceAudit.log({
           invoice_id: newInvoice.id,
           action: 'created',
-          new_value: { amount: total, subtotal, taxAmount, merchant: formData.merchantName, status: 'draft' },
+          new_value: { amount: total, subtotal, taxAmount, merchant: formData.merchantName, fromCompany: selectedFromCompany.name, status: 'draft' },
         });
       }
 
@@ -673,9 +725,10 @@ export default function InvoicePage() {
       buildPdfContent(doc, invoice);
       const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-      const itemsList = invoice.items.map(item => `  - ${item.description}: $${item.amount.toLocaleString()}`).join('\n');
+      const sym = getCurrencySymbol(invoice.currency);
+      const itemsList = invoice.items.map(item => `  - ${item.description}: ${sym}${item.amount.toLocaleString()}`).join('\n');
       const invoiceNum = invoice.invoiceNumber || formatInvoiceId(invoice.id);
-      const subject = `Invoice ${invoiceNum} from ${defaultFromCompany.name}`;
+      const subject = `Invoice ${invoiceNum} from ${invoice.fromCompany.name}`;
       const body =
         `Dear ${invoice.toCompany.name || invoice.merchant},\n\n` +
         `Please find attached Invoice ${invoiceNum}.\n\n` +
@@ -683,13 +736,14 @@ export default function InvoicePage() {
         `Due Date: ${invoice.dueDate}\n` +
         `Currency: ${invoice.currency}\n\n` +
         `Items:\n${itemsList}\n\n` +
-        `Total Amount: $${invoice.amount.toLocaleString()}\n` +
-        `Balance Due: $${(invoice.amount - invoice.paidToDate).toLocaleString()}\n\n` +
+        `Total Amount: ${sym}${invoice.amount.toLocaleString()}\n` +
+        `Balance Due: ${sym}${(invoice.amount - invoice.paidToDate).toLocaleString()}\n\n` +
         `Payment Details:\n` +
-        `Bank: ${defaultFromCompany.bankName}\n` +
-        `Account: ${defaultFromCompany.bankAccount}\n\n` +
-        `${invoice.notes || 'Payment terms: Net 30 days.'}\n\n` +
-        `Best regards,\n${defaultFromCompany.name}`;
+        `Bank: ${invoice.fromCompany.bankName}\n` +
+        `Account: ${invoice.fromCompany.bankAccount}\n` +
+        (invoice.fromCompany.swiftCode ? `SWIFT: ${invoice.fromCompany.swiftCode}\n` : '') +
+        `\n${invoice.notes || 'Payment terms: Net 30 days.'}\n\n` +
+        `Best regards,\n${invoice.fromCompany.name}`;
 
       const res = await fetch('/api/send-invoice', {
         method: 'POST',
@@ -1094,6 +1148,55 @@ export default function InvoicePage() {
             <div className="flex flex-1 overflow-hidden">
               {/* Left: Form */}
               <div className="w-1/2 overflow-y-auto p-6 space-y-6 border-r border-border">
+                {/* From Section - Company Selector */}
+                <div className="space-y-4 pb-4 border-b border-border">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {language === 'zh' ? '开票方' : 'From'}
+                  </h3>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      {language === 'zh' ? '选择公司' : 'Select Company'} *
+                    </label>
+                    <select
+                      value={formData.fromCompanyId}
+                      onChange={(e) => setFormData({ ...formData, fromCompanyId: e.target.value })}
+                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      {FROM_COMPANIES.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name} ({company.country})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="p-3 bg-secondary/50 rounded-lg border border-border">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{selectedFromCompany.legalName || selectedFromCompany.name}</p>
+                      {formatCompanyAddress(selectedFromCompany).map((line, i) => (
+                        <p key={i} className="text-xs text-muted-foreground">{line}</p>
+                      ))}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-border grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Email: </span>
+                        <span className="text-foreground">{selectedFromCompany.email}</span>
+                      </div>
+                      {selectedFromCompany.phone && (
+                        <div>
+                          <span className="text-muted-foreground">Phone: </span>
+                          <span className="text-foreground">{selectedFromCompany.phone}</span>
+                        </div>
+                      )}
+                      {selectedFromCompany.taxId && (
+                        <div>
+                          <span className="text-muted-foreground">Tax ID: </span>
+                          <span className="text-foreground">{selectedFromCompany.taxId}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Bill To Section */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-foreground">{language === 'zh' ? '开票给' : 'Bill To'}</h3>
@@ -1365,10 +1468,17 @@ export default function InvoicePage() {
                   {/* From Section */}
                   <div className="mt-4">
                     <p className="text-[8px] font-bold text-gray-400">From</p>
-                    <p className="text-[10px] font-bold mt-0.5">{defaultFromCompany.name}</p>
-                    <p className="text-[8px] text-[#333]">{defaultFromCompany.address}</p>
-                    <p className="text-[8px] text-[#333]">{[defaultFromCompany.city, defaultFromCompany.state, defaultFromCompany.postalCode].filter(Boolean).join(', ')}</p>
-                    <p className="text-[8px] text-[#333]">{defaultFromCompany.country}</p>
+                    <p className="text-[10px] font-bold mt-0.5">{selectedFromCompany.legalName || selectedFromCompany.name}</p>
+                    <p className="text-[8px] text-[#333]">{selectedFromCompany.address}</p>
+                    <p className="text-[8px] text-[#333]">
+                      {[selectedFromCompany.city, selectedFromCompany.state, selectedFromCompany.postalCode]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </p>
+                    <p className="text-[8px] text-[#333]">{selectedFromCompany.country}</p>
+                    {selectedFromCompany.taxId && (
+                      <p className="text-[8px] text-gray-400 mt-1">Tax ID: {selectedFromCompany.taxId}</p>
+                    )}
                   </div>
 
                   {/* To Section */}
@@ -1450,13 +1560,21 @@ export default function InvoicePage() {
                   <div className="mt-4 bg-[#f5f5f5] rounded-sm p-3">
                     <p className="text-[9px] font-bold text-[#333]">Invoice Note</p>
                     <p className="text-[7px] text-gray-400 mt-1">{formData.notes || 'Payment terms: Net 30 days. Thank you for your business!'}</p>
-                    <p className="text-[7px] text-[#333] mt-1">Bank: {defaultFromCompany.bankName}</p>
-                    <p className="text-[7px] text-[#333]">Account: {defaultFromCompany.bankAccount}</p>
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <p className="text-[7px] text-[#333]">Bank: {selectedFromCompany.bankName}</p>
+                      <p className="text-[7px] text-[#333]">Account: {selectedFromCompany.bankAccount}</p>
+                      {selectedFromCompany.swiftCode && (
+                        <p className="text-[7px] text-[#333]">SWIFT: {selectedFromCompany.swiftCode}</p>
+                      )}
+                      {selectedFromCompany.bankRouting && (
+                        <p className="text-[7px] text-[#333]">Routing: {selectedFromCompany.bankRouting}</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Footer */}
                   <div className="mt-auto pt-4 flex justify-between items-center text-[7px]">
-                    <span className="text-gray-400">{defaultFromCompany.email}</span>
+                    <span className="text-gray-400">{selectedFromCompany.email}</span>
                     <span style={{ color: 'rgb(41, 98, 255)' }}>Powered by SollAI</span>
                   </div>
                 </div>
@@ -1491,12 +1609,16 @@ export default function InvoicePage() {
                 <div className="p-3 bg-secondary/30 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1">{language === 'zh' ? '开票方' : 'From'}</p>
                   <p className="text-sm font-medium text-foreground">{selectedInvoice.fromCompany.name}</p>
-                  <p className="text-xs text-muted-foreground">{selectedInvoice.fromCompany.city}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {[selectedInvoice.fromCompany.city, selectedInvoice.fromCompany.country].filter(Boolean).join(', ')}
+                  </p>
                 </div>
                 <div className="p-3 bg-secondary/30 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1">{language === 'zh' ? '开票给' : 'To'}</p>
                   <p className="text-sm font-medium text-foreground">{selectedInvoice.toCompany.name}</p>
-                  <p className="text-xs text-muted-foreground">{selectedInvoice.toCompany.city}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {[selectedInvoice.toCompany.city, selectedInvoice.toCompany.country].filter(Boolean).join(', ')}
+                  </p>
                 </div>
               </div>
 
