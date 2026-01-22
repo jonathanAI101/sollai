@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FileText, Shield, Zap, Download, ArrowRight } from 'lucide-react';
+import { FileText, Brain, Globe, Zap, Users, ArrowRight } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { ThemeLanguageToggle } from '@/components/layout';
 
@@ -10,19 +10,24 @@ export default function LandingPage() {
 
   const features = [
     {
-      icon: Zap,
+      icon: Brain,
       titleKey: 'landing.feature1.title',
       descKey: 'landing.feature1.desc',
     },
     {
-      icon: Shield,
+      icon: Globe,
       titleKey: 'landing.feature2.title',
       descKey: 'landing.feature2.desc',
     },
     {
-      icon: Download,
+      icon: Zap,
       titleKey: 'landing.feature3.title',
       descKey: 'landing.feature3.desc',
+    },
+    {
+      icon: Users,
+      titleKey: 'landing.feature4.title',
+      descKey: 'landing.feature4.desc',
     },
   ];
 
@@ -50,7 +55,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6">
+      <section className="pt-32 pb-24 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-foreground tracking-tight leading-tight">
             {t('landing.hero.title')}
@@ -70,23 +75,25 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Grid */}
       <section className="py-20 px-6 border-t border-border">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-12 md:gap-16">
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (
-                <div key={index} className="text-center md:text-left">
-                  <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center mx-auto md:mx-0 mb-4">
+                <div key={index} className="flex gap-5">
+                  <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center shrink-0">
                     <Icon className="w-6 h-6 text-foreground" />
                   </div>
-                  <h3 className="text-base font-semibold text-foreground mb-2">
-                    {t(feature.titleKey)}
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {t(feature.descKey)}
-                  </p>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      {t(feature.titleKey)}
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {t(feature.descKey)}
+                    </p>
+                  </div>
                 </div>
               );
             })}
@@ -94,7 +101,31 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Simple CTA Section */}
+      {/* Stats Section */}
+      <section className="py-16 px-6 border-t border-border bg-secondary/30">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div>
+              <p className="text-3xl font-bold text-foreground">50+</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('landing.stats.currencies')}</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-foreground">200+</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('landing.stats.methods')}</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-foreground">20+</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('landing.stats.markets')}</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-foreground">25%</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('landing.stats.savings')}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
       <section className="py-20 px-6 border-t border-border">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-foreground mb-4">
@@ -118,7 +149,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <FileText className="w-4 h-4" />
-            <span>SollAI Invoice</span>
+            <span>SollAI</span>
           </div>
           <p className="text-xs text-muted-foreground">
             {t('landing.footer.privacy')}
