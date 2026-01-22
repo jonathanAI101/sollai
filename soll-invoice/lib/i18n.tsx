@@ -48,14 +48,54 @@ const translations: Record<Language, Record<string, string>> = {
     'landing.footer.privacy': 'SollAI · AI 驱动的全球达人营销平台',
 
     // Navigation
-    'nav.invoice': '开票',
-    'nav.customers': '客户',
-    'nav.products': '产品',
-    'nav.history': '历史',
+    'nav.dashboard': '仪表盘',
+    'nav.creators': '达人',
+    'nav.merchants': '商家',
+    'nav.invoice': '发票',
+    'nav.settlement': '结算',
     'nav.settings': '设置',
+
+    // Dashboard
+    'dashboard.title': '仪表盘',
+    'dashboard.totalCreators': '达人总数',
+    'dashboard.totalMerchants': '商家总数',
+    'dashboard.pendingInvoices': '待处理发票',
+    'dashboard.monthlyRevenue': '本月收入',
+    'dashboard.recentActivity': '最近活动',
+    'dashboard.upcomingEvents': '即将进行',
+    'dashboard.noActivity': '暂无活动',
+    'dashboard.noEvents': '暂无事件',
+
+    // Creators
+    'creators.title': '达人管理',
+    'creators.add': '添加达人',
+    'creators.searchPlaceholder': '搜索达人名称、账号...',
+    'creators.name': '达人',
+    'creators.platform': '平台',
+    'creators.followers': '粉丝数',
+    'creators.category': '类目',
+    'creators.status': '状态',
+
+    // Merchants
+    'merchants.title': '商家管理',
+    'merchants.add': '添加商家',
+    'merchants.searchPlaceholder': '搜索商家名称...',
+    'merchants.campaigns': '个活动',
+
+    // Settlement
+    'settlement.title': '结算管理',
+    'settlement.totalPaid': '已结算',
+    'settlement.pending': '待结算',
+    'settlement.processing': '处理中',
+    'settlement.creator': '达人',
+    'settlement.campaign': '活动',
+    'settlement.amount': '金额',
+    'settlement.date': '日期',
+    'settlement.status': '状态',
 
     // Common
     'common.add': '添加',
+    'common.filter': '筛选',
     'common.edit': '编辑',
     'common.delete': '删除',
     'common.save': '保存',
@@ -70,7 +110,9 @@ const translations: Record<Language, Record<string, string>> = {
     'common.export': '导出',
 
     // Invoice
-    'invoice.title': '快速开票',
+    'invoice.title': '发票管理',
+    'invoice.create': '创建发票',
+    'invoice.searchPlaceholder': '搜索发票号、达人、商家...',
     'invoice.new': '新建发票',
     'invoice.seller': '销售方',
     'invoice.buyer': '购买方',
@@ -86,12 +128,29 @@ const translations: Record<Language, Record<string, string>> = {
     'invoice.preview': '预览',
     'invoice.submit': '确认开票',
     'invoice.number': '发票编号',
+    'invoice.creator': '达人',
+    'invoice.merchant': '商家',
+    'invoice.campaign': '活动',
+    'invoice.amount': '金额',
+    'invoice.dueDate': '到期日',
+    'invoice.status': '状态',
+    'invoice.actions': '操作',
     'invoice.selectCompany': '选择开票主体',
     'invoice.selectCustomer': '点击选择或搜索客户',
     'invoice.noCompany': '请先在设置中添加开票主体',
     'invoice.emptyItems': '点击"添加项目"从产品库选择，或"手动添加"',
 
+    // Invoice Stats
+    'invoice.stats.total': '总金额',
+    'invoice.stats.paid': '已支付',
+    'invoice.stats.pending': '待处理',
+    'invoice.stats.overdue': '已逾期',
+
     // Invoice Status
+    'invoice.status.paid': '已支付',
+    'invoice.status.pending': '待处理',
+    'invoice.status.overdue': '已逾期',
+    'invoice.status.draft': '草稿',
     'status.draft': '草稿',
     'status.issued': '已开票',
     'status.paid': '已付款',
@@ -268,14 +327,54 @@ const translations: Record<Language, Record<string, string>> = {
     'landing.footer.privacy': 'SollAI · AI-Powered Global Creator Marketing Platform',
 
     // Navigation
+    'nav.dashboard': 'Dashboard',
+    'nav.creators': 'Creators',
+    'nav.merchants': 'Merchants',
     'nav.invoice': 'Invoice',
-    'nav.customers': 'Customers',
-    'nav.products': 'Products',
-    'nav.history': 'History',
+    'nav.settlement': 'Settlement',
     'nav.settings': 'Settings',
+
+    // Dashboard
+    'dashboard.title': 'Dashboard',
+    'dashboard.totalCreators': 'Total Creators',
+    'dashboard.totalMerchants': 'Total Merchants',
+    'dashboard.pendingInvoices': 'Pending Invoices',
+    'dashboard.monthlyRevenue': 'Monthly Revenue',
+    'dashboard.recentActivity': 'Recent Activity',
+    'dashboard.upcomingEvents': 'Upcoming Events',
+    'dashboard.noActivity': 'No activity yet',
+    'dashboard.noEvents': 'No events yet',
+
+    // Creators
+    'creators.title': 'Creator Management',
+    'creators.add': 'Add Creator',
+    'creators.searchPlaceholder': 'Search by name, handle...',
+    'creators.name': 'Creator',
+    'creators.platform': 'Platform',
+    'creators.followers': 'Followers',
+    'creators.category': 'Category',
+    'creators.status': 'Status',
+
+    // Merchants
+    'merchants.title': 'Merchant Management',
+    'merchants.add': 'Add Merchant',
+    'merchants.searchPlaceholder': 'Search merchant name...',
+    'merchants.campaigns': 'campaigns',
+
+    // Settlement
+    'settlement.title': 'Settlement',
+    'settlement.totalPaid': 'Total Paid',
+    'settlement.pending': 'Pending',
+    'settlement.processing': 'Processing',
+    'settlement.creator': 'Creator',
+    'settlement.campaign': 'Campaign',
+    'settlement.amount': 'Amount',
+    'settlement.date': 'Date',
+    'settlement.status': 'Status',
 
     // Common
     'common.add': 'Add',
+    'common.filter': 'Filter',
     'common.edit': 'Edit',
     'common.delete': 'Delete',
     'common.save': 'Save',
@@ -290,7 +389,9 @@ const translations: Record<Language, Record<string, string>> = {
     'common.export': 'Export',
 
     // Invoice
-    'invoice.title': 'Quick Invoice',
+    'invoice.title': 'Invoice Management',
+    'invoice.create': 'Create Invoice',
+    'invoice.searchPlaceholder': 'Search invoice, creator, merchant...',
     'invoice.new': 'New Invoice',
     'invoice.seller': 'Seller',
     'invoice.buyer': 'Buyer',
@@ -306,12 +407,29 @@ const translations: Record<Language, Record<string, string>> = {
     'invoice.preview': 'Preview',
     'invoice.submit': 'Create Invoice',
     'invoice.number': 'Invoice No.',
+    'invoice.creator': 'Creator',
+    'invoice.merchant': 'Merchant',
+    'invoice.campaign': 'Campaign',
+    'invoice.amount': 'Amount',
+    'invoice.dueDate': 'Due Date',
+    'invoice.status': 'Status',
+    'invoice.actions': 'Actions',
     'invoice.selectCompany': 'Select Company',
     'invoice.selectCustomer': 'Click to select or search customer',
     'invoice.noCompany': 'Please add a company in settings first',
     'invoice.emptyItems': 'Click "Add Item" to select from products, or "Manual Add"',
 
+    // Invoice Stats
+    'invoice.stats.total': 'Total Amount',
+    'invoice.stats.paid': 'Paid',
+    'invoice.stats.pending': 'Pending',
+    'invoice.stats.overdue': 'Overdue',
+
     // Invoice Status
+    'invoice.status.paid': 'Paid',
+    'invoice.status.pending': 'Pending',
+    'invoice.status.overdue': 'Overdue',
+    'invoice.status.draft': 'Draft',
     'status.draft': 'Draft',
     'status.issued': 'Issued',
     'status.paid': 'Paid',

@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileText, Users, Package, Clock, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Store, FileText, Settings, Wallet } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { ThemeLanguageToggle } from './ThemeLanguageToggle';
 import { LogoSnake3 } from '@/components/ui/Logo';
 
 const navItems = [
+  { href: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { href: '/creators', labelKey: 'nav.creators', icon: Users },
+  { href: '/merchants', labelKey: 'nav.merchants', icon: Store },
   { href: '/invoice', labelKey: 'nav.invoice', icon: FileText },
-  { href: '/customers', labelKey: 'nav.customers', icon: Users },
-  { href: '/products', labelKey: 'nav.products', icon: Package },
-  { href: '/history', labelKey: 'nav.history', icon: Clock },
+  { href: '/settlement', labelKey: 'nav.settlement', icon: Wallet },
   { href: '/settings', labelKey: 'nav.settings', icon: Settings },
 ];
 
