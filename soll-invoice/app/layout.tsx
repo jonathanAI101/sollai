@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SollAI Invoice - 快速开票",
-  description: "简约高效的快速开票 Web 应用",
-  keywords: ["发票", "开票", "invoice", "SollAI"],
+  title: "SollAI - AI Creator Marketing Platform",
+  description: "AI-powered global creator marketing platform",
+  keywords: ["SollAI", "creator", "marketing", "influencer", "invoice"],
 };
 
 export const viewport: Viewport = {

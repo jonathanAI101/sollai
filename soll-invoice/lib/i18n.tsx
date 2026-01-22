@@ -190,7 +190,7 @@ const translations: Record<Language, Record<string, string>> = {
     'customer.bankAccount': '银行账号',
     'customer.tags': '标签',
     'customer.empty': '暂无客户',
-    'customer.emptyHint': '添加您的第一个客户，方便快速开票',
+    'customer.emptyHint': '添加您的第一个客户',
     'customer.searchPlaceholder': '搜索客户名称、税号...',
 
     // Customer Tags
@@ -267,7 +267,7 @@ const translations: Record<Language, Record<string, string>> = {
     // About
     'about.title': '关于',
     'about.version': '版本',
-    'about.description': '一款简约高效的快速开票工具，数据完全存储在本地，保护您的隐私安全。',
+    'about.description': 'AI 驱动的全球达人营销平台，帮助品牌连接全球创作者，实现营销目标。',
 
     // Theme
     'theme.title': '主题',
@@ -490,7 +490,7 @@ const translations: Record<Language, Record<string, string>> = {
     'customer.bankAccount': 'Bank Account',
     'customer.tags': 'Tags',
     'customer.empty': 'No customers',
-    'customer.emptyHint': 'Add your first customer for quick invoicing',
+    'customer.emptyHint': 'Add your first customer',
     'customer.searchPlaceholder': 'Search by name, tax ID...',
 
     // Customer Tags
@@ -567,7 +567,7 @@ const translations: Record<Language, Record<string, string>> = {
     // About
     'about.title': 'About',
     'about.version': 'Version',
-    'about.description': 'A simple and efficient invoicing tool. All data is stored locally for your privacy.',
+    'about.description': 'AI-powered global creator marketing platform, helping brands connect with creators worldwide.',
 
     // Theme
     'theme.title': 'Theme',
