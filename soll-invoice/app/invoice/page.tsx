@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout, Header } from '@/components/layout';
 import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
+import { db, type Tables } from '@/lib/supabase/hooks';
 import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Printer } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
@@ -81,6 +82,13 @@ export default function InvoicePage() {
   const [lineItems, setLineItems] = useState<InvoiceItem[]>([
     { description: '', quantity: 1, rate: 0, amount: 0 }
   ]);
+
+  // Merchants from Supabase
+  const [merchants, setMerchants] = useState<Tables<'merchants'>[]>([]);
+
+  useEffect(() => {
+    db.merchants.getAll().then(setMerchants).catch(console.error);
+  }, []);
 
   // Mock invoice data with line items
   const [invoices, setInvoices] = useState<Invoice[]>([
@@ -769,16 +777,22 @@ export default function InvoicePage() {
                   <select
                     value={formData.merchant}
                     onChange={(e) => {
-                      setFormData({ ...formData, merchant: e.target.value, toCompanyName: e.target.value });
+                      const selected = merchants.find(m => m.name === e.target.value);
+                      setFormData({
+                        ...formData,
+                        merchant: e.target.value,
+                        toCompanyName: e.target.value,
+                        toCompanyAddress: selected?.address || '',
+                        toCompanyCity: selected?.city || '',
+                        toCompanyEmail: selected?.email || '',
+                      });
                     }}
                     className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">{t('invoice.selectMerchant')}</option>
-                    <option value="TechBrand Inc.">TechBrand Inc.</option>
-                    <option value="Fashion Forward">Fashion Forward</option>
-                    <option value="Beauty Co.">Beauty Co.</option>
-                    <option value="Sports Plus">Sports Plus</option>
-                    <option value="Food & Co.">Food & Co.</option>
+                    {merchants.map((m) => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
