@@ -1,7 +1,7 @@
 'use client';
 
 import { Layout, Header } from '@/components/layout';
-import { CompanyList, ThemeLanguageSettings } from '@/components/settings';
+import { CompanyList } from '@/components/settings';
 import { Download, Upload, Building2 } from 'lucide-react';
 import { exportAllData, importAllData } from '@/lib/db';
 import { useI18n } from '@/lib/i18n';
@@ -60,9 +60,6 @@ export default function SettingsPage() {
         <section>
           <CompanyList />
         </section>
-
-        {/* Theme & Language Settings */}
-        <ThemeLanguageSettings />
 
         {/* Data Management Section */}
         <section>

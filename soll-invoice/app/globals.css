@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
   --background: #fafafa;
   --foreground: #18181b;
   --card: #ffffff;
@@ -23,7 +24,8 @@
 }
 
 /* Dark mode via class (for manual toggle) */
-.dark {
+html.dark {
+  color-scheme: dark;
   --background: #09090b;
   --foreground: #fafafa;
   --card: #18181b;

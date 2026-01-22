@@ -12,6 +12,21 @@ interface I18nContextType {
 
 const translations: Record<Language, Record<string, string>> = {
   zh: {
+    // Landing Page
+    'landing.login': '进入应用',
+    'landing.hero.title': '简约高效的快速开票工具',
+    'landing.hero.subtitle': '轻松管理客户、产品和发票，数据完全存储在本地，保护您的隐私安全。',
+    'landing.feature1.title': '快速开票',
+    'landing.feature1.desc': '预设产品和客户信息，一键生成专业发票，提高工作效率。',
+    'landing.feature2.title': '本地存储',
+    'landing.feature2.desc': '所有数据存储在您的设备上，无需担心隐私泄露，完全掌控您的数据。',
+    'landing.feature3.title': 'PDF导出',
+    'landing.feature3.desc': '一键导出专业PDF发票，支持打印和邮件发送，满足各种业务需求。',
+    'landing.cta.start': '开始使用',
+    'landing.cta.title': '准备好开始了吗？',
+    'landing.cta.subtitle': '无需注册，即刻使用，数据完全由您掌控。',
+    'landing.footer.privacy': '所有数据均存储在本地',
+
     // Navigation
     'nav.invoice': '开票',
     'nav.customers': '客户',
@@ -197,6 +212,21 @@ const translations: Record<Language, Record<string, string>> = {
     'unit.year': '年',
   },
   en: {
+    // Landing Page
+    'landing.login': 'Open App',
+    'landing.hero.title': 'Simple & Efficient Invoicing',
+    'landing.hero.subtitle': 'Manage customers, products, and invoices with ease. All data stored locally for complete privacy.',
+    'landing.feature1.title': 'Quick Invoicing',
+    'landing.feature1.desc': 'Pre-set products and customers for one-click professional invoice generation.',
+    'landing.feature2.title': 'Local Storage',
+    'landing.feature2.desc': 'All data stays on your device. No privacy concerns, you own your data.',
+    'landing.feature3.title': 'PDF Export',
+    'landing.feature3.desc': 'Export professional PDF invoices for printing or emailing to clients.',
+    'landing.cta.start': 'Get Started',
+    'landing.cta.title': 'Ready to get started?',
+    'landing.cta.subtitle': 'No registration required. Start now, your data stays with you.',
+    'landing.footer.privacy': 'All data stored locally on your device',
+
     // Navigation
     'nav.invoice': 'Invoice',
     'nav.customers': 'Customers',
@@ -386,7 +416,7 @@ const translations: Record<Language, Record<string, string>> = {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('zh');
+  const [language, setLanguageState] = useState<Language>('en');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

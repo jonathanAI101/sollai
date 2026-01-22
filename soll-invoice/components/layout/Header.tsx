@@ -1,6 +1,7 @@
 'use client';
 
 import { FileText } from 'lucide-react';
+import { ThemeLanguageToggle } from './ThemeLanguageToggle';
 
 interface HeaderProps {
   title: string;
@@ -11,7 +12,7 @@ export function Header({ title, action }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-sm border-b border-border">
       <div className="flex items-center justify-between h-14 px-4">
-        {/* Mobile Logo (hidden on desktop) */}
+        {/* Mobile Logo & Title */}
         <div className="flex items-center gap-3 md:hidden">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <FileText className="w-5 h-5 text-primary-foreground" />
@@ -24,8 +25,13 @@ export function Header({ title, action }: HeaderProps) {
           {title}
         </h1>
 
-        {/* Action Button */}
-        {action && <div>{action}</div>}
+        {/* Right side: Theme/Language toggle (mobile) + Action */}
+        <div className="flex items-center gap-2">
+          <div className="md:hidden">
+            <ThemeLanguageToggle />
+          </div>
+          {action && <div>{action}</div>}
+        </div>
       </div>
     </header>
   );

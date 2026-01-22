@@ -6,7 +6,7 @@ import { FileText, Users, Package, Clock, Settings } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
 const navItems = [
-  { href: '/', labelKey: 'nav.invoice', icon: FileText },
+  { href: '/invoice', labelKey: 'nav.invoice', icon: FileText },
   { href: '/customers', labelKey: 'nav.customers', icon: Users },
   { href: '/products', labelKey: 'nav.products', icon: Package },
   { href: '/history', labelKey: 'nav.history', icon: Clock },
