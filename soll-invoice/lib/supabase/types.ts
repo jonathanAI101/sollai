@@ -132,6 +132,9 @@ export type Database = {
           to_company: Json;
           paid_to_date: number;
           notes: string | null;
+          tax_rate: number;
+          tax_amount: number;
+          subtotal: number;
           voided_at: string | null;
           voided_reason: string | null;
           created_at: string;
@@ -154,6 +157,9 @@ export type Database = {
           to_company?: Json;
           paid_to_date?: number;
           notes?: string | null;
+          tax_rate?: number;
+          tax_amount?: number;
+          subtotal?: number;
           voided_at?: string | null;
           voided_reason?: string | null;
           created_at?: string;
@@ -176,6 +182,9 @@ export type Database = {
           to_company?: Json;
           paid_to_date?: number;
           notes?: string | null;
+          tax_rate?: number;
+          tax_amount?: number;
+          subtotal?: number;
           voided_at?: string | null;
           voided_reason?: string | null;
           created_at?: string;

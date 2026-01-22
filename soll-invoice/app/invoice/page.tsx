@@ -21,6 +21,8 @@ type CompanyInfo = {
   name: string;
   address: string;
   city: string;
+  state: string;
+  postalCode: string;
   country: string;
   email: string;
   phone: string;
@@ -44,13 +46,18 @@ type Invoice = {
   toCompany: CompanyInfo;
   paidToDate: number;
   notes: string;
+  taxRate: number;
+  taxAmount: number;
+  subtotal: number;
 };
 
 // Default company info
 const defaultFromCompany: CompanyInfo = {
   name: 'SollAI Inc.',
   address: '123 Innovation Drive, Suite 100',
-  city: 'San Francisco, CA 94105',
+  city: 'San Francisco',
+  state: 'CA',
+  postalCode: '94105',
   country: 'United States',
   email: 'billing@sollai.com',
   phone: '+1 (555) 123-4567',
@@ -97,12 +104,16 @@ export default function InvoicePage() {
     description: '',
     currency: 'USD',
     dueDate: '',
+    issueDate: new Date().toISOString().split('T')[0],
     notes: '',
     toCompanyName: '',
+    toCompanyEmail: '',
     toCompanyAddress: '',
     toCompanyCity: '',
-    toCompanyCountry: '',
-    toCompanyEmail: '',
+    toCompanyState: '',
+    toCompanyPostalCode: '',
+    toCompanyCountry: 'United States',
+    taxRate: 0,
   });
 
   // Line items for new invoice
@@ -117,23 +128,40 @@ export default function InvoicePage() {
   const [loading, setLoading] = useState(true);
 
   // Convert DB row to local Invoice type
-  const mapDbToInvoice = (row: InvoiceWithRelations): Invoice => ({
-    id: row.id,
-    invoiceNumber: row.invoice_number,
-    merchantId: row.merchant_id,
-    merchant: row.merchants?.name || row.merchant_name_snapshot,
-    description: row.description,
-    amount: row.amount,
-    currency: row.currency,
-    issueDate: row.issue_date,
-    dueDate: row.due_date || '',
-    status: row.status as Invoice['status'],
-    items: (row.items as InvoiceItem[]) || [],
-    fromCompany: (row.from_company as CompanyInfo) || defaultFromCompany,
-    toCompany: (row.to_company as CompanyInfo) || { name: '', address: '', city: '', country: '', email: '', phone: '', bankName: '', bankAccount: '' },
-    paidToDate: row.paid_to_date,
-    notes: row.notes || '',
-  });
+  const mapDbToInvoice = (row: InvoiceWithRelations): Invoice => {
+    const toCompany = row.to_company as Record<string, string> | null;
+    return {
+      id: row.id,
+      invoiceNumber: row.invoice_number,
+      merchantId: row.merchant_id,
+      merchant: row.merchants?.name || row.merchant_name_snapshot,
+      description: row.description,
+      amount: row.amount,
+      currency: row.currency,
+      issueDate: row.issue_date,
+      dueDate: row.due_date || '',
+      status: row.status as Invoice['status'],
+      items: (row.items as InvoiceItem[]) || [],
+      fromCompany: (row.from_company as CompanyInfo) || defaultFromCompany,
+      toCompany: {
+        name: toCompany?.name || '',
+        address: toCompany?.address || '',
+        city: toCompany?.city || '',
+        state: toCompany?.state || '',
+        postalCode: toCompany?.postalCode || '',
+        country: toCompany?.country || '',
+        email: toCompany?.email || '',
+        phone: toCompany?.phone || '',
+        bankName: toCompany?.bankName || '',
+        bankAccount: toCompany?.bankAccount || '',
+      },
+      paidToDate: row.paid_to_date,
+      notes: row.notes || '',
+      taxRate: (row as Record<string, unknown>).tax_rate as number || 0,
+      taxAmount: (row as Record<string, unknown>).tax_amount as number || 0,
+      subtotal: (row as Record<string, unknown>).subtotal as number || row.amount,
+    };
+  };
 
   // Format UUID to readable invoice number
   const formatInvoiceId = (id: string) => {
@@ -242,9 +270,27 @@ export default function InvoicePage() {
     }
   };
 
-  // Calculate total from line items
-  const calculateTotal = () => {
+  // Calculate subtotal from line items
+  const calculateSubtotal = () => {
     return lineItems.reduce((sum, item) => sum + item.amount, 0);
+  };
+
+  // Calculate tax amount
+  const calculateTax = () => {
+    return calculateSubtotal() * (formData.taxRate / 100);
+  };
+
+  // Calculate total (subtotal + tax)
+  const calculateTotal = () => {
+    return calculateSubtotal() + calculateTax();
+  };
+
+  // Get currency symbol
+  const getCurrencySymbol = (currency: string) => {
+    const symbols: Record<string, string> = {
+      USD: '$', EUR: '€', GBP: '£', CNY: '¥', JPY: '¥', CAD: '$', AUD: '$', CHF: 'CHF '
+    };
+    return symbols[currency] || '$';
   };
 
   // Build PDF content (shared between download and email)
@@ -283,7 +329,8 @@ export default function InvoicePage() {
     doc.setFontSize(9);
     doc.text(invoice.fromCompany.address, margin, y);
     y += 4;
-    doc.text(invoice.fromCompany.city, margin, y);
+    const fromCityLine = [invoice.fromCompany.city, invoice.fromCompany.state, invoice.fromCompany.postalCode].filter(Boolean).join(', ');
+    doc.text(fromCityLine || invoice.fromCompany.city, margin, y);
     y += 4;
     doc.text(invoice.fromCompany.country, margin, y);
     y += 10;
@@ -303,11 +350,22 @@ export default function InvoicePage() {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(invoice.toCompany.address, margin, y);
-    y += 4;
-    doc.text(invoice.toCompany.city, margin, y);
-    y += 4;
+    if (invoice.toCompany.address) {
+      doc.text(invoice.toCompany.address, margin, y);
+      y += 4;
+    }
+    const cityLine = [invoice.toCompany.city, invoice.toCompany.state, invoice.toCompany.postalCode].filter(Boolean).join(', ');
+    if (cityLine) {
+      doc.text(cityLine, margin, y);
+      y += 4;
+    }
     doc.text(invoice.toCompany.country, margin, y);
+    if (invoice.toCompany.email) {
+      y += 4;
+      doc.setTextColor(...mutedColor);
+      doc.text(invoice.toCompany.email, margin, y);
+      doc.setTextColor(...textColor);
+    }
 
     // Invoice details on the right side
     const detailsX = pageWidth - margin - 60;
@@ -356,12 +414,13 @@ export default function InvoicePage() {
     y = tableStartY + 8;
 
     // Table rows
+    const sym = getCurrencySymbol(invoice.currency);
     doc.setFont('helvetica', 'normal');
     invoice.items.forEach((item) => {
       doc.text(item.description, colX[0], y);
       doc.text(item.quantity.toString(), colX[1], y);
-      doc.text(`$${item.rate.toLocaleString()}`, colX[2], y);
-      doc.text(`$${item.amount.toLocaleString()}`, colX[3], y);
+      doc.text(`${sym}${item.rate.toLocaleString()}`, colX[2], y);
+      doc.text(`${sym}${item.amount.toLocaleString()}`, colX[3], y);
       y += 8;
     });
 
@@ -375,19 +434,28 @@ export default function InvoicePage() {
     const totalsX = pageWidth - margin - 60;
     const totalsValueX = pageWidth - margin;
 
+    const subtotalAmount = invoice.subtotal || invoice.amount;
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...mutedColor);
     doc.text('Sub Total', totalsX, y);
     doc.setTextColor(...textColor);
-    doc.text(`$${invoice.amount.toLocaleString()}`, totalsValueX, y, { align: 'right' });
+    doc.text(`${sym}${subtotalAmount.toLocaleString()}`, totalsValueX, y, { align: 'right' });
     y += 7;
+
+    if (invoice.taxRate && invoice.taxRate > 0) {
+      doc.setTextColor(...mutedColor);
+      doc.text(`Tax (${invoice.taxRate}%)`, totalsX, y);
+      doc.setTextColor(...textColor);
+      doc.text(`${sym}${(invoice.taxAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, totalsValueX, y, { align: 'right' });
+      y += 7;
+    }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...textColor);
     doc.text('Total', totalsX, y);
-    doc.text(`$${invoice.amount.toLocaleString()}`, totalsValueX, y, { align: 'right' });
+    doc.text(`${sym}${invoice.amount.toLocaleString()}`, totalsValueX, y, { align: 'right' });
     y += 7;
 
     doc.setFont('helvetica', 'normal');
@@ -395,7 +463,7 @@ export default function InvoicePage() {
     doc.setTextColor(...mutedColor);
     doc.text('Paid to Date', totalsX, y);
     doc.setTextColor(...textColor);
-    doc.text(`$${invoice.paidToDate.toLocaleString()}`, totalsValueX, y, { align: 'right' });
+    doc.text(`${sym}${invoice.paidToDate.toLocaleString()}`, totalsValueX, y, { align: 'right' });
     y += 7;
 
     const balance = invoice.amount - invoice.paidToDate;
@@ -403,7 +471,7 @@ export default function InvoicePage() {
     doc.setFontSize(11);
     doc.setTextColor(...primaryColor);
     doc.text('Balance', totalsX, y);
-    doc.text(`$${balance.toLocaleString()}`, totalsValueX, y, { align: 'right' });
+    doc.text(`${sym}${balance.toLocaleString()}`, totalsValueX, y, { align: 'right' });
 
     y += 20;
 
@@ -454,7 +522,13 @@ export default function InvoicePage() {
     setShowCreateModal(false);
     setIsEditMode(false);
     setEditingInvoice(null);
-    setFormData({ merchantId: '', merchantName: '', description: '', currency: 'USD', dueDate: '', notes: '', toCompanyName: '', toCompanyAddress: '', toCompanyCity: '', toCompanyCountry: '', toCompanyEmail: '' });
+    setFormData({
+      merchantId: '', merchantName: '', description: '', currency: 'USD',
+      dueDate: '', issueDate: new Date().toISOString().split('T')[0], notes: '',
+      toCompanyName: '', toCompanyEmail: '', toCompanyAddress: '',
+      toCompanyCity: '', toCompanyState: '', toCompanyPostalCode: '',
+      toCompanyCountry: 'United States', taxRate: 0,
+    });
     setLineItems([{ description: '', quantity: 1, rate: 0, amount: 0 }]);
   };
 
@@ -472,12 +546,16 @@ export default function InvoicePage() {
       description: invoice.description,
       currency: invoice.currency,
       dueDate: invoice.dueDate,
+      issueDate: invoice.issueDate,
       notes: invoice.notes,
       toCompanyName: invoice.toCompany.name,
+      toCompanyEmail: invoice.toCompany.email || '',
       toCompanyAddress: invoice.toCompany.address,
       toCompanyCity: invoice.toCompany.city,
-      toCompanyCountry: invoice.toCompany.country,
-      toCompanyEmail: invoice.toCompany.email,
+      toCompanyState: invoice.toCompany.state || '',
+      toCompanyPostalCode: invoice.toCompany.postalCode || '',
+      toCompanyCountry: invoice.toCompany.country || 'United States',
+      taxRate: invoice.taxRate || 0,
     });
     setLineItems(invoice.items.length > 0 ? [...invoice.items] : [{ description: '', quantity: 1, rate: 0, amount: 0 }]);
 
@@ -490,15 +568,19 @@ export default function InvoicePage() {
   const handleSaveInvoice = async () => {
     if (!formData.merchantId || lineItems.every(item => !item.description)) return;
 
+    const subtotal = calculateSubtotal();
+    const taxAmount = calculateTax();
     const total = calculateTotal();
     const validItems = lineItems.filter(item => item.description);
 
     const toCompany = {
       name: formData.toCompanyName || formData.merchantName,
+      email: formData.toCompanyEmail || '',
       address: formData.toCompanyAddress || '',
       city: formData.toCompanyCity || '',
+      state: formData.toCompanyState || '',
+      postalCode: formData.toCompanyPostalCode || '',
       country: formData.toCompanyCountry || 'United States',
-      email: formData.toCompanyEmail || '',
       phone: '',
       bankName: '',
       bankAccount: '',
@@ -509,29 +591,30 @@ export default function InvoicePage() {
         await db.invoices.update(editingInvoice.id, {
           merchant_id: formData.merchantId,
           merchant_name_snapshot: formData.merchantName,
-          description: validItems[0]?.description || 'Marketing services',
+          description: validItems[0]?.description || 'Services',
           amount: total,
           currency: formData.currency,
+          issue_date: formData.issueDate || new Date().toISOString().split('T')[0],
           due_date: formData.dueDate || null,
           items: validItems as unknown as Json,
           to_company: toCompany as unknown as Json,
           notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
-        });
+        } as Record<string, unknown> as never);
 
         await db.invoiceAudit.log({
           invoice_id: editingInvoice.id,
           action: 'updated',
           old_value: { amount: editingInvoice.amount, merchant: editingInvoice.merchant },
-          new_value: { amount: total, merchant: formData.merchantName },
+          new_value: { amount: total, merchant: formData.merchantName, taxRate: formData.taxRate },
         });
       } else {
         const newInvoice = await db.invoices.create({
           merchant_id: formData.merchantId,
           merchant_name_snapshot: formData.merchantName,
-          description: validItems[0]?.description || 'Marketing services',
+          description: validItems[0]?.description || 'Services',
           amount: total,
           currency: formData.currency,
-          issue_date: new Date().toISOString().split('T')[0],
+          issue_date: formData.issueDate || new Date().toISOString().split('T')[0],
           due_date: formData.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           status: 'draft',
           items: validItems as unknown as Json,
@@ -544,7 +627,7 @@ export default function InvoicePage() {
         await db.invoiceAudit.log({
           invoice_id: newInvoice.id,
           action: 'created',
-          new_value: { amount: total, merchant: formData.merchantName, status: 'draft' },
+          new_value: { amount: total, subtotal, taxAmount, merchant: formData.merchantName, status: 'draft' },
         });
       }
 
@@ -1025,9 +1108,12 @@ export default function InvoicePage() {
                           merchantId: e.target.value,
                           merchantName: selected?.name || '',
                           toCompanyName: selected?.name || '',
+                          toCompanyEmail: selected?.email || '',
                           toCompanyAddress: selected?.address || '',
                           toCompanyCity: selected?.city || '',
-                          toCompanyEmail: selected?.email || '',
+                          toCompanyState: '',
+                          toCompanyPostalCode: selected?.postal_code || '',
+                          toCompanyCountry: selected?.country || 'United States',
                         });
                       }}
                       className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1038,26 +1124,90 @@ export default function InvoicePage() {
                       ))}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      {language === 'zh' ? '邮箱' : 'Email'} *
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.toCompanyEmail}
+                      onChange={(e) => setFormData({ ...formData, toCompanyEmail: e.target.value })}
+                      placeholder="billing@company.com"
+                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      {language === 'zh' ? '地址' : 'Address'}
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.toCompanyAddress}
+                      onChange={(e) => setFormData({ ...formData, toCompanyAddress: e.target.value })}
+                      placeholder={language === 'zh' ? '街道地址...' : 'Street address...'}
+                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '地址' : 'Address'}</label>
-                      <input
-                        type="text"
-                        value={formData.toCompanyAddress}
-                        onChange={(e) => setFormData({ ...formData, toCompanyAddress: e.target.value })}
-                        placeholder={language === 'zh' ? '街道地址...' : 'Street address...'}
-                        className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '城市' : 'City'}</label>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        {language === 'zh' ? '城市' : 'City'}
+                      </label>
                       <input
                         type="text"
                         value={formData.toCompanyCity}
                         onChange={(e) => setFormData({ ...formData, toCompanyCity: e.target.value })}
-                        placeholder={language === 'zh' ? '城市, 邮编' : 'City, State ZIP'}
+                        placeholder="Hamburg"
                         className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        {language === 'zh' ? '州/省' : 'State / Province'}
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.toCompanyState}
+                        onChange={(e) => setFormData({ ...formData, toCompanyState: e.target.value })}
+                        placeholder="CA"
+                        className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        {language === 'zh' ? '邮编' : 'Postal Code'}
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.toCompanyPostalCode}
+                        onChange={(e) => setFormData({ ...formData, toCompanyPostalCode: e.target.value })}
+                        placeholder="20095"
+                        className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        {language === 'zh' ? '国家' : 'Country'}
+                      </label>
+                      <select
+                        value={formData.toCompanyCountry}
+                        onChange={(e) => setFormData({ ...formData, toCompanyCountry: e.target.value })}
+                        className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="United States">United States</option>
+                        <option value="Germany">Germany</option>
+                        <option value="United Kingdom">United Kingdom</option>
+                        <option value="France">France</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Australia">Australia</option>
+                        <option value="Japan">Japan</option>
+                        <option value="China">China</option>
+                        <option value="Singapore">Singapore</option>
+                        <option value="Netherlands">Netherlands</option>
+                        <option value="Switzerland">Switzerland</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1070,6 +1220,13 @@ export default function InvoicePage() {
                       <Plus className="w-3.5 h-3.5" />
                       {t('invoice.addItem')}
                     </button>
+                  </div>
+                  <div className="flex gap-2 items-center text-xs text-muted-foreground font-medium">
+                    <div className="flex-1">{language === 'zh' ? '描述' : 'Description'}</div>
+                    <div className="w-16 text-center">{language === 'zh' ? '数量' : 'Qty'}</div>
+                    <div className="w-28 text-center">{language === 'zh' ? '单价' : 'Rate'}</div>
+                    <div className="w-20 text-right">{language === 'zh' ? '金额' : 'Amount'}</div>
+                    <div className="w-8"></div>
                   </div>
                   <div className="space-y-2">
                     {lineItems.map((item, index) => (
@@ -1088,15 +1245,23 @@ export default function InvoicePage() {
                           min="1"
                           className="w-16 px-2 py-2 bg-secondary border border-border rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary"
                         />
-                        <input
-                          type="number"
-                          value={item.rate}
-                          onChange={(e) => updateLineItem(index, 'rate', e.target.value)}
-                          min="0"
-                          placeholder="0"
-                          className="w-24 px-2 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
-                        <span className="w-20 text-sm text-foreground text-right">${item.amount.toLocaleString()}</span>
+                        <div className="relative w-28">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                            {getCurrencySymbol(formData.currency)}
+                          </span>
+                          <input
+                            type="number"
+                            value={item.rate}
+                            onChange={(e) => updateLineItem(index, 'rate', e.target.value)}
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            className="w-full pl-7 pr-2 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                        <span className="w-20 text-sm text-foreground text-right font-medium">
+                          {getCurrencySymbol(formData.currency)}{item.amount.toLocaleString()}
+                        </span>
                         <button
                           onClick={() => removeLineItem(index)}
                           className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
@@ -1110,7 +1275,7 @@ export default function InvoicePage() {
                 </div>
 
                 {/* Invoice Details */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">{t('invoice.currency')}</label>
                     <select
@@ -1118,10 +1283,14 @@ export default function InvoicePage() {
                       onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                       className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     >
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                      <option value="CNY">CNY</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="CNY">CNY (¥)</option>
+                      <option value="JPY">JPY (¥)</option>
+                      <option value="CAD">CAD ($)</option>
+                      <option value="AUD">AUD ($)</option>
+                      <option value="CHF">CHF</option>
                     </select>
                   </div>
                   <div>
@@ -1132,6 +1301,24 @@ export default function InvoicePage() {
                       onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                       className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      {language === 'zh' ? '税率' : 'Tax Rate'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={formData.taxRate}
+                        onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        placeholder="0"
+                        className="w-full px-3 py-2 pr-8 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1167,7 +1354,7 @@ export default function InvoicePage() {
                     </div>
                     <div className="flex gap-4">
                       <span className="text-gray-400">Date</span>
-                      <span className="text-[#333]">{new Date().toISOString().split('T')[0]}</span>
+                      <span className="text-[#333]">{formData.issueDate}</span>
                     </div>
                     <div className="flex gap-4">
                       <span className="text-gray-400">Invoice Due</span>
@@ -1180,17 +1367,26 @@ export default function InvoicePage() {
                     <p className="text-[8px] font-bold text-gray-400">From</p>
                     <p className="text-[10px] font-bold mt-0.5">{defaultFromCompany.name}</p>
                     <p className="text-[8px] text-[#333]">{defaultFromCompany.address}</p>
-                    <p className="text-[8px] text-[#333]">{defaultFromCompany.city}</p>
+                    <p className="text-[8px] text-[#333]">{[defaultFromCompany.city, defaultFromCompany.state, defaultFromCompany.postalCode].filter(Boolean).join(', ')}</p>
                     <p className="text-[8px] text-[#333]">{defaultFromCompany.country}</p>
                   </div>
 
                   {/* To Section */}
                   <div className="mt-3">
                     <p className="text-[8px] font-bold text-gray-400">To</p>
-                    <p className="text-[10px] font-bold mt-0.5">{formData.merchantName || '—'}</p>
-                    <p className="text-[8px] text-[#333]">{formData.toCompanyAddress || ''}</p>
-                    <p className="text-[8px] text-[#333]">{formData.toCompanyCity || ''}</p>
-                    <p className="text-[8px] text-[#333]">{formData.toCompanyCountry || 'United States'}</p>
+                    <p className="text-[10px] font-bold mt-0.5">{formData.toCompanyName || formData.merchantName || '—'}</p>
+                    {formData.toCompanyAddress && (
+                      <p className="text-[8px] text-[#333]">{formData.toCompanyAddress}</p>
+                    )}
+                    <p className="text-[8px] text-[#333]">
+                      {[formData.toCompanyCity, formData.toCompanyState, formData.toCompanyPostalCode]
+                        .filter(Boolean)
+                        .join(', ') || '—'}
+                    </p>
+                    <p className="text-[8px] text-[#333]">{formData.toCompanyCountry}</p>
+                    {formData.toCompanyEmail && (
+                      <p className="text-[8px] text-gray-400 mt-1">{formData.toCompanyEmail}</p>
+                    )}
                   </div>
 
                   {/* Items Table */}
@@ -1208,8 +1404,8 @@ export default function InvoicePage() {
                         <div key={index} className="px-2 py-1 grid grid-cols-12 gap-1 text-[8px] text-[#333]">
                           <div className="col-span-6">{item.description || '—'}</div>
                           <div className="col-span-2">{item.quantity}</div>
-                          <div className="col-span-2">${item.rate.toLocaleString()}</div>
-                          <div className="col-span-2">${item.amount.toLocaleString()}</div>
+                          <div className="col-span-2">{getCurrencySymbol(formData.currency)}{item.rate.toLocaleString()}</div>
+                          <div className="col-span-2">{getCurrencySymbol(formData.currency)}{item.amount.toLocaleString()}</div>
                         </div>
                       ))
                     ) : (
@@ -1227,19 +1423,25 @@ export default function InvoicePage() {
                     <div className="w-40 space-y-1 text-[8px]">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Sub Total</span>
-                        <span className="text-[#333]">${calculateTotal().toLocaleString()}</span>
+                        <span className="text-[#333]">{getCurrencySymbol(formData.currency)}{calculateSubtotal().toLocaleString()}</span>
                       </div>
+                      {formData.taxRate > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Tax ({formData.taxRate}%)</span>
+                          <span className="text-[#333]">{getCurrencySymbol(formData.currency)}{calculateTax().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-bold text-[10px]">
                         <span className="text-[#333]">Total</span>
-                        <span className="text-[#333]">${calculateTotal().toLocaleString()}</span>
+                        <span className="text-[#333]">{getCurrencySymbol(formData.currency)}{calculateTotal().toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Paid to Date</span>
-                        <span className="text-[#333]">$0</span>
+                        <span className="text-[#333]">{getCurrencySymbol(formData.currency)}0</span>
                       </div>
                       <div className="flex justify-between font-bold text-[10px]">
                         <span style={{ color: 'rgb(41, 98, 255)' }}>Balance</span>
-                        <span style={{ color: 'rgb(41, 98, 255)' }}>${calculateTotal().toLocaleString()}</span>
+                        <span style={{ color: 'rgb(41, 98, 255)' }}>{getCurrencySymbol(formData.currency)}{calculateTotal().toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
