@@ -67,9 +67,9 @@ export default function SettlementPage() {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-      case 'pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'processing': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'completed': return 'bg-green-900/30 text-green-400';
+      case 'pending': return 'bg-yellow-900/30 text-yellow-400';
+      case 'processing': return 'bg-blue-900/30 text-blue-400';
       default: return '';
     }
   };

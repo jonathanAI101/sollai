@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Layout, Header } from '@/components/layout';
 import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
 import { db, type Tables } from '@/lib/supabase/hooks';
-import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Printer } from 'lucide-react';
+import type { Json } from '@/lib/supabase/types';
+import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Mail } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 type InvoiceItem = {
@@ -63,6 +64,24 @@ export default function InvoicePage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState<string | null>(null);
+  const [emailTarget, setEmailTarget] = useState<{ invoice: Invoice; email: string } | null>(null);
+
+  // Click-outside to close menus
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setShowFilterMenu(false);
+      }
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-more-menu]')) {
+        setShowMoreMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Form state for creating invoice
   const [formData, setFormData] = useState({
@@ -85,151 +104,49 @@ export default function InvoicePage() {
 
   // Merchants from Supabase
   const [merchants, setMerchants] = useState<Tables<'merchants'>[]>([]);
+  // Invoices from Supabase
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Convert DB row to local Invoice type
+  const mapDbToInvoice = (row: Tables<'invoices'>): Invoice => ({
+    id: row.id,
+    merchant: row.merchant,
+    description: row.description,
+    amount: row.amount,
+    currency: row.currency,
+    issueDate: row.issue_date,
+    dueDate: row.due_date || '',
+    status: row.status as Invoice['status'],
+    items: (row.items as InvoiceItem[]) || [],
+    fromCompany: (row.from_company as CompanyInfo) || defaultFromCompany,
+    toCompany: (row.to_company as CompanyInfo) || { name: '', address: '', city: '', country: '', email: '', phone: '', bankName: '', bankAccount: '' },
+    paidToDate: row.paid_to_date,
+    notes: row.notes || '',
+  });
+
+  // Format UUID to readable invoice number
+  const formatInvoiceId = (id: string) => {
+    if (id.startsWith('INV-')) return id;
+    return `INV-${id.substring(0, 8).toUpperCase()}`;
+  };
+
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true);
+      const data = await db.invoices.getAll();
+      setInvoices(data.map(mapDbToInvoice));
+    } catch (e) {
+      console.error('Failed to fetch invoices:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     db.merchants.getAll().then(setMerchants).catch(console.error);
+    fetchInvoices();
   }, []);
-
-  // Mock invoice data with line items
-  const [invoices, setInvoices] = useState<Invoice[]>([
-    {
-      id: 'INV-2024-001',
-      merchant: 'TechBrand Inc.',
-      description: 'Campaign management fee',
-      amount: 2500.00,
-      currency: 'USD',
-      issueDate: '2024-01-15',
-      dueDate: '2024-02-15',
-      status: 'paid',
-      items: [
-        { description: 'Social Media Campaign Management', quantity: 1, rate: 1500, amount: 1500 },
-        { description: 'Content Creation Package', quantity: 2, rate: 500, amount: 1000 },
-      ],
-      fromCompany: defaultFromCompany,
-      toCompany: {
-        name: 'TechBrand Inc.',
-        address: '456 Tech Avenue',
-        city: 'Los Angeles, CA 90001',
-        country: 'United States',
-        email: 'accounts@techbrand.com',
-        phone: '+1 (555) 987-6543',
-        bankName: '',
-        bankAccount: '',
-      },
-      paidToDate: 2500,
-      notes: 'Payment terms: Net 30 days. Thank you for your business!',
-    },
-    {
-      id: 'INV-2024-002',
-      merchant: 'Fashion Forward',
-      description: 'Influencer marketing services',
-      amount: 1800.00,
-      currency: 'USD',
-      issueDate: '2024-01-14',
-      dueDate: '2024-02-14',
-      status: 'pending',
-      items: [
-        { description: 'Influencer Outreach Services', quantity: 1, rate: 800, amount: 800 },
-        { description: 'Campaign Analytics Report', quantity: 1, rate: 500, amount: 500 },
-        { description: 'Content Review & Approval', quantity: 1, rate: 500, amount: 500 },
-      ],
-      fromCompany: defaultFromCompany,
-      toCompany: {
-        name: 'Fashion Forward LLC',
-        address: '789 Fashion Blvd',
-        city: 'New York, NY 10001',
-        country: 'United States',
-        email: 'finance@fashionforward.com',
-        phone: '+1 (555) 456-7890',
-        bankName: '',
-        bankAccount: '',
-      },
-      paidToDate: 0,
-      notes: 'Payment terms: Net 30 days.',
-    },
-    {
-      id: 'INV-2024-003',
-      merchant: 'Beauty Co.',
-      description: 'Content creation package',
-      amount: 3200.00,
-      currency: 'USD',
-      issueDate: '2024-01-13',
-      dueDate: '2024-02-13',
-      status: 'overdue',
-      items: [
-        { description: 'Video Production', quantity: 4, rate: 500, amount: 2000 },
-        { description: 'Photo Shoot', quantity: 2, rate: 400, amount: 800 },
-        { description: 'Post-Production Editing', quantity: 1, rate: 400, amount: 400 },
-      ],
-      fromCompany: defaultFromCompany,
-      toCompany: {
-        name: 'Beauty Co. International',
-        address: '321 Beauty Lane',
-        city: 'Miami, FL 33101',
-        country: 'United States',
-        email: 'payments@beautyco.com',
-        phone: '+1 (555) 234-5678',
-        bankName: '',
-        bankAccount: '',
-      },
-      paidToDate: 0,
-      notes: 'Payment terms: Net 30 days. Late payments subject to 1.5% monthly interest.',
-    },
-    {
-      id: 'INV-2024-004',
-      merchant: 'Sports Plus',
-      description: 'Social media promotion',
-      amount: 1500.00,
-      currency: 'USD',
-      issueDate: '2024-01-12',
-      dueDate: '2024-02-12',
-      status: 'paid',
-      items: [
-        { description: 'Instagram Campaign', quantity: 1, rate: 800, amount: 800 },
-        { description: 'TikTok Promotion', quantity: 1, rate: 700, amount: 700 },
-      ],
-      fromCompany: defaultFromCompany,
-      toCompany: {
-        name: 'Sports Plus Ltd.',
-        address: '555 Sports Way',
-        city: 'Chicago, IL 60601',
-        country: 'United States',
-        email: 'billing@sportsplus.com',
-        phone: '+1 (555) 345-6789',
-        bankName: '',
-        bankAccount: '',
-      },
-      paidToDate: 1500,
-      notes: 'Payment terms: Net 30 days.',
-    },
-    {
-      id: 'INV-2024-005',
-      merchant: 'Food & Co.',
-      description: 'Video production services',
-      amount: 2100.00,
-      currency: 'USD',
-      issueDate: '2024-01-11',
-      dueDate: '2024-02-11',
-      status: 'pending',
-      items: [
-        { description: 'Recipe Video Production', quantity: 3, rate: 500, amount: 1500 },
-        { description: 'Social Media Distribution', quantity: 1, rate: 600, amount: 600 },
-      ],
-      fromCompany: defaultFromCompany,
-      toCompany: {
-        name: 'Food & Co.',
-        address: '888 Culinary Street',
-        city: 'Austin, TX 78701',
-        country: 'United States',
-        email: 'ap@foodandco.com',
-        phone: '+1 (555) 567-8901',
-        bankName: '',
-        bankAccount: '',
-      },
-      paidToDate: 0,
-      notes: 'Payment terms: Net 30 days.',
-    },
-  ]);
 
   // Filter invoices
   const filteredInvoices = invoices.filter(invoice => {
@@ -255,10 +172,10 @@ export default function InvoicePage() {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'paid': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-      case 'pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'overdue': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-      case 'draft': return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
+      case 'paid': return 'bg-green-900/30 text-green-400';
+      case 'pending': return 'bg-yellow-900/30 text-yellow-400';
+      case 'overdue': return 'bg-red-900/30 text-red-400';
+      case 'draft': return 'bg-gray-800 text-gray-400';
       default: return '';
     }
   };
@@ -310,14 +227,8 @@ export default function InvoicePage() {
     return lineItems.reduce((sum, item) => sum + item.amount, 0);
   };
 
-  // Generate Professional A4 PDF Invoice
-  const generatePDF = (invoice: Invoice) => {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
-
+  // Build PDF content (shared between download and email)
+  const buildPdfContent = (doc: jsPDF, invoice: Invoice) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
     let y = 20;
@@ -388,7 +299,7 @@ export default function InvoicePage() {
     doc.text('Invoice No.', detailsX, detailsY);
     doc.setTextColor(...textColor);
     doc.setFont('helvetica', 'bold');
-    doc.text(invoice.id, detailsX + 35, detailsY);
+    doc.text(formatInvoiceId(invoice.id), detailsX + 35, detailsY);
     detailsY += 6;
 
     doc.setFont('helvetica', 'normal');
@@ -510,43 +421,53 @@ export default function InvoicePage() {
     doc.setTextColor(...primaryColor);
     doc.text('Powered by SollAI', pageWidth - margin, footerY, { align: 'right' });
 
-    // Save PDF
-    doc.save(`${invoice.id}.pdf`);
   };
 
-  const handleCreateInvoice = () => {
+  // Generate and download PDF
+  const generatePDF = (invoice: Invoice) => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    buildPdfContent(doc, invoice);
+    doc.save(`${formatInvoiceId(invoice.id)}.pdf`);
+  };
+
+  const handleCreateInvoice = async () => {
     if (!formData.merchant || lineItems.every(item => !item.description)) return;
 
     const total = calculateTotal();
-    const newInvoice: Invoice = {
-      id: `INV-2024-${String(invoices.length + 1).padStart(3, '0')}`,
-      merchant: formData.merchant,
-      description: lineItems[0]?.description || 'Marketing services',
-      amount: total,
-      currency: formData.currency,
-      issueDate: new Date().toISOString().split('T')[0],
-      dueDate: formData.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'draft',
-      items: lineItems.filter(item => item.description),
-      fromCompany: defaultFromCompany,
-      toCompany: {
-        name: formData.toCompanyName || formData.merchant,
-        address: formData.toCompanyAddress || '',
-        city: formData.toCompanyCity || '',
-        country: formData.toCompanyCountry || 'United States',
-        email: formData.toCompanyEmail || '',
-        phone: '',
-        bankName: '',
-        bankAccount: '',
-      },
-      paidToDate: 0,
-      notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
-    };
+    const validItems = lineItems.filter(item => item.description);
 
-    setInvoices([newInvoice, ...invoices]);
-    setShowCreateModal(false);
-    setFormData({ merchant: '', description: '', currency: 'USD', dueDate: '', notes: '', toCompanyName: '', toCompanyAddress: '', toCompanyCity: '', toCompanyCountry: '', toCompanyEmail: '' });
-    setLineItems([{ description: '', quantity: 1, rate: 0, amount: 0 }]);
+    try {
+      await db.invoices.create({
+        merchant: formData.merchant,
+        description: validItems[0]?.description || 'Marketing services',
+        amount: total,
+        currency: formData.currency,
+        issue_date: new Date().toISOString().split('T')[0],
+        due_date: formData.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: 'draft',
+        items: validItems as unknown as Json,
+        from_company: defaultFromCompany as unknown as Json,
+        to_company: {
+          name: formData.toCompanyName || formData.merchant,
+          address: formData.toCompanyAddress || '',
+          city: formData.toCompanyCity || '',
+          country: formData.toCompanyCountry || 'United States',
+          email: formData.toCompanyEmail || '',
+          phone: '',
+          bankName: '',
+          bankAccount: '',
+        } as unknown as Json,
+        paid_to_date: 0,
+        notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
+      });
+
+      await fetchInvoices();
+      setShowCreateModal(false);
+      setFormData({ merchant: '', description: '', currency: 'USD', dueDate: '', notes: '', toCompanyName: '', toCompanyAddress: '', toCompanyCity: '', toCompanyCountry: '', toCompanyEmail: '' });
+      setLineItems([{ description: '', quantity: 1, rate: 0, amount: 0 }]);
+    } catch (e) {
+      console.error('Failed to create invoice:', e);
+    }
   };
 
   const handleViewInvoice = (invoice: Invoice) => {
@@ -560,11 +481,76 @@ export default function InvoicePage() {
     setShowMoreMenu(null);
   };
 
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+
+  const handleSendEmail = (invoice: Invoice) => {
+    setEmailTarget({ invoice, email: invoice.toCompany.email || '' });
+    setShowMoreMenu(null);
+  };
+
+  const confirmSendEmail = async () => {
+    if (!emailTarget) return;
+    const { invoice, email } = emailTarget;
+    if (!email) {
+      alert(language === 'zh' ? '请输入收件人邮箱' : 'Please enter recipient email');
+      return;
+    }
+
+    setSendingEmail(invoice.id);
+
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      buildPdfContent(doc, invoice);
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+      const itemsList = invoice.items.map(item => `  - ${item.description}: $${item.amount.toLocaleString()}`).join('\n');
+      const subject = `Invoice ${formatInvoiceId(invoice.id)} from ${defaultFromCompany.name}`;
+      const body =
+        `Dear ${invoice.toCompany.name || invoice.merchant},\n\n` +
+        `Please find attached Invoice ${formatInvoiceId(invoice.id)}.\n\n` +
+        `Invoice Date: ${invoice.issueDate}\n` +
+        `Due Date: ${invoice.dueDate}\n` +
+        `Currency: ${invoice.currency}\n\n` +
+        `Items:\n${itemsList}\n\n` +
+        `Total Amount: $${invoice.amount.toLocaleString()}\n` +
+        `Balance Due: $${(invoice.amount - invoice.paidToDate).toLocaleString()}\n\n` +
+        `Payment Details:\n` +
+        `Bank: ${defaultFromCompany.bankName}\n` +
+        `Account: ${defaultFromCompany.bankAccount}\n\n` +
+        `${invoice.notes || 'Payment terms: Net 30 days.'}\n\n` +
+        `Best regards,\n${defaultFromCompany.name}`;
+
+      const res = await fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: email, subject, body, pdfBase64, invoiceId: formatInvoiceId(invoice.id) }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert(language === 'zh' ? `邮件已发送至 ${email}` : `Email sent to ${email}`);
+      setEmailTarget(null);
+    } catch (e) {
+      alert(language === 'zh' ? `发送失败: ${e instanceof Error ? e.message : '未知错误'}` : `Failed to send: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setSendingEmail(null);
+    }
+  };
+
+  const escapeCsv = (value: string | number) => {
+    const str = String(value);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
   const handleExportAll = () => {
     const csvContent = [
       ['Invoice No', 'Merchant', 'Description', 'Amount', 'Currency', 'Issue Date', 'Due Date', 'Status'],
       ...filteredInvoices.map(inv => [
-        inv.id, inv.merchant, inv.description, inv.amount, inv.currency, inv.issueDate, inv.dueDate, inv.status
+        escapeCsv(formatInvoiceId(inv.id)), escapeCsv(inv.merchant), escapeCsv(inv.description),
+        inv.amount, inv.currency, inv.issueDate, inv.dueDate, inv.status
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -579,15 +565,31 @@ export default function InvoicePage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleDeleteInvoice = (id: string) => {
-    setInvoices(invoices.filter(inv => inv.id !== id));
-    setShowDetailModal(false);
-    setShowMoreMenu(null);
+  const handleDeleteInvoice = async (id: string) => {
+    try {
+      await db.invoices.delete(id);
+      setInvoices(invoices.filter(inv => inv.id !== id));
+      setShowDetailModal(false);
+      setShowMoreMenu(null);
+    } catch (e) {
+      console.error('Failed to delete invoice:', e);
+    }
   };
 
-  const handleMarkAsPaid = (id: string) => {
-    setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: 'paid' as const, paidToDate: inv.amount } : inv));
-    setShowMoreMenu(null);
+  const handleChangeStatus = async (id: string, newStatus: Invoice['status']) => {
+    try {
+      const invoice = invoices.find(inv => inv.id === id);
+      const paidToDate = newStatus === 'paid' ? (invoice?.amount || 0) : 0;
+      await db.invoices.update(id, { status: newStatus, paid_to_date: paidToDate });
+      setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: newStatus, paidToDate } : inv));
+      setShowMoreMenu(null);
+    } catch (e) {
+      console.error('Failed to update status:', e);
+    }
+  };
+
+  const handleMarkAsPaid = async (id: string) => {
+    await handleChangeStatus(id, 'paid');
   };
 
   return (
@@ -635,7 +637,7 @@ export default function InvoicePage() {
               className="w-full pl-10 pr-4 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <div className="relative">
+          <div className="relative" ref={filterRef}>
             <Button variant="outline" size="sm" onClick={() => setShowFilterMenu(!showFilterMenu)}>
               <Filter className="w-4 h-4" />
               {t('common.filter')}
@@ -663,8 +665,7 @@ export default function InvoicePage() {
         </div>
 
         {/* Invoices Table */}
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-card rounded-xl border border-border relative">
             <table className="w-full">
               <thead className="bg-secondary/50">
                 <tr>
@@ -678,10 +679,10 @@ export default function InvoicePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredInvoices.map((invoice) => (
+                {!loading && filteredInvoices.map((invoice) => (
                   <tr key={invoice.id} className="hover:bg-secondary/30 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-mono text-sm font-medium text-primary">{invoice.id}</span>
+                      <span className="font-mono text-sm font-medium text-primary">{formatInvoiceId(invoice.id)}</span>
                     </td>
                     <td className="px-4 py-3 text-sm text-foreground">{invoice.merchant}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{invoice.description}</td>
@@ -711,7 +712,19 @@ export default function InvoicePage() {
                         >
                           <Download className="w-4 h-4 text-muted-foreground" />
                         </button>
-                        <div className="relative">
+                        <button
+                          onClick={() => handleSendEmail(invoice)}
+                          className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                          title={language === 'zh' ? '发送邮件' : 'Send Email'}
+                          disabled={sendingEmail === invoice.id}
+                        >
+                          {sendingEmail === invoice.id ? (
+                            <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                          ) : (
+                            <Mail className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        <div className="relative" data-more-menu>
                           <button
                             onClick={() => setShowMoreMenu(showMoreMenu === invoice.id ? null : invoice.id)}
                             className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
@@ -720,16 +733,19 @@ export default function InvoicePage() {
                             <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
                           </button>
                           {showMoreMenu === invoice.id && (
-                            <div className="absolute right-0 top-full mt-1 w-40 bg-card border border-border rounded-lg shadow-lg z-10 py-1">
-                              {invoice.status !== 'paid' && (
+                            <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-lg shadow-lg z-10 py-1">
+                              <p className="text-xs font-medium text-muted-foreground px-3 py-1">{t('invoice.status')}</p>
+                              {(['draft', 'pending', 'paid', 'overdue'] as const).filter(s => s !== invoice.status).map((s) => (
                                 <button
-                                  onClick={() => handleMarkAsPaid(invoice.id)}
-                                  className="w-full text-left px-3 py-2 text-sm hover:bg-secondary flex items-center gap-2"
+                                  key={s}
+                                  onClick={() => handleChangeStatus(invoice.id, s)}
+                                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary flex items-center gap-2"
                                 >
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
-                                  {t('history.markPaid')}
+                                  {getStatusIcon(s)}
+                                  {getStatusLabel(s)}
                                 </button>
-                              )}
+                              ))}
+                              <div className="border-t border-border my-1" />
                               <button
                                 onClick={() => handleDeleteInvoice(invoice.id)}
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-secondary flex items-center gap-2 text-red-500"
@@ -744,7 +760,14 @@ export default function InvoicePage() {
                     </td>
                   </tr>
                 ))}
-                {filteredInvoices.length === 0 && (
+                {loading && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                      {language === 'zh' ? '加载中...' : 'Loading...'}
+                    </td>
+                  </tr>
+                )}
+                {!loading && filteredInvoices.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                       {t('common.noData')}
@@ -753,182 +776,273 @@ export default function InvoicePage() {
                 )}
               </tbody>
             </table>
-          </div>
         </div>
       </div>
 
-      {/* Create Invoice Modal */}
+      {/* Create Invoice Slide-out Panel */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCreateModal(false)} />
-          <div className="relative bg-card border border-border rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateModal(false)} />
+          <div className="relative ml-auto w-full max-w-5xl bg-card border-l border-border shadow-2xl flex flex-col transition-transform duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
               <h2 className="text-lg font-semibold text-foreground">{t('invoice.create')}</h2>
-              <button onClick={() => setShowCreateModal(false)} className="p-1.5 hover:bg-secondary rounded-lg transition-colors">
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="p-4 space-y-6">
-              {/* Bill To Section */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-foreground">{language === 'zh' ? '开票给' : 'Bill To'}</h3>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('invoice.merchant')} *</label>
-                  <select
-                    value={formData.merchant}
-                    onChange={(e) => {
-                      const selected = merchants.find(m => m.name === e.target.value);
-                      setFormData({
-                        ...formData,
-                        merchant: e.target.value,
-                        toCompanyName: e.target.value,
-                        toCompanyAddress: selected?.address || '',
-                        toCompanyCity: selected?.city || '',
-                        toCompanyEmail: selected?.email || '',
-                      });
-                    }}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">{t('invoice.selectMerchant')}</option>
-                    {merchants.map((m) => (
-                      <option key={m.id} value={m.name}>{m.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '地址' : 'Address'}</label>
-                    <input
-                      type="text"
-                      value={formData.toCompanyAddress}
-                      onChange={(e) => setFormData({ ...formData, toCompanyAddress: e.target.value })}
-                      placeholder={language === 'zh' ? '街道地址...' : 'Street address...'}
-                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '城市' : 'City'}</label>
-                    <input
-                      type="text"
-                      value={formData.toCompanyCity}
-                      onChange={(e) => setFormData({ ...formData, toCompanyCity: e.target.value })}
-                      placeholder={language === 'zh' ? '城市, 邮编' : 'City, State ZIP'}
-                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                </div>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="sm" onClick={() => setShowCreateModal(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button size="sm" onClick={handleCreateInvoice}>
+                  {t('invoice.submit')}
+                </Button>
               </div>
+            </div>
 
-              {/* Line Items Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-foreground">{t('invoice.items')}</h3>
-                  <button
-                    onClick={addLineItem}
-                    className="text-sm text-primary hover:underline flex items-center gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    {t('invoice.addItem')}
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground">
-                    <div className="col-span-5">{t('invoice.description')}</div>
-                    <div className="col-span-2">{language === 'zh' ? '数量' : 'Qty'}</div>
-                    <div className="col-span-2">{language === 'zh' ? '单价' : 'Rate'}</div>
-                    <div className="col-span-2">{t('invoice.amount')}</div>
-                    <div className="col-span-1"></div>
+            {/* Content: Form + Preview */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left: Form */}
+              <div className="w-1/2 overflow-y-auto p-6 space-y-6 border-r border-border">
+                {/* Bill To Section */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-foreground">{language === 'zh' ? '开票给' : 'Bill To'}</h3>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">{t('invoice.merchant')} *</label>
+                    <select
+                      value={formData.merchant}
+                      onChange={(e) => {
+                        const selected = merchants.find(m => m.name === e.target.value);
+                        setFormData({
+                          ...formData,
+                          merchant: e.target.value,
+                          toCompanyName: e.target.value,
+                          toCompanyAddress: selected?.address || '',
+                          toCompanyCity: selected?.city || '',
+                          toCompanyEmail: selected?.email || '',
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="">{t('invoice.selectMerchant')}</option>
+                      {merchants.map((m) => (
+                        <option key={m.id} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
                   </div>
-                  {lineItems.map((item, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '地址' : 'Address'}</label>
                       <input
                         type="text"
-                        value={item.description}
-                        onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                        placeholder={t('invoice.descriptionPlaceholder')}
-                        className="col-span-5 px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        value={formData.toCompanyAddress}
+                        onChange={(e) => setFormData({ ...formData, toCompanyAddress: e.target.value })}
+                        placeholder={language === 'zh' ? '街道地址...' : 'Street address...'}
+                        className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       />
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateLineItem(index, 'quantity', e.target.value)}
-                        min="1"
-                        className="col-span-2 px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                      <input
-                        type="number"
-                        value={item.rate}
-                        onChange={(e) => updateLineItem(index, 'rate', e.target.value)}
-                        min="0"
-                        placeholder="0.00"
-                        className="col-span-2 px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                      <div className="col-span-2 px-3 py-2 bg-secondary/50 border border-border rounded-lg text-sm text-foreground">
-                        ${item.amount.toLocaleString()}
-                      </div>
-                      <button
-                        onClick={() => removeLineItem(index)}
-                        className="col-span-1 p-2 hover:bg-secondary rounded-lg transition-colors"
-                        disabled={lineItems.length === 1}
-                      >
-                        <Trash2 className={`w-4 h-4 ${lineItems.length === 1 ? 'text-muted-foreground/30' : 'text-red-500'}`} />
-                      </button>
                     </div>
-                  ))}
-                </div>
-                <div className="flex justify-end pt-2 border-t border-border">
-                  <div className="text-right">
-                    <span className="text-sm text-muted-foreground mr-4">{language === 'zh' ? '总计' : 'Total'}:</span>
-                    <span className="text-lg font-bold text-foreground">${calculateTotal().toLocaleString()}</span>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '城市' : 'City'}</label>
+                      <input
+                        type="text"
+                        value={formData.toCompanyCity}
+                        onChange={(e) => setFormData({ ...formData, toCompanyCity: e.target.value })}
+                        placeholder={language === 'zh' ? '城市, 邮编' : 'City, State ZIP'}
+                        className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Invoice Details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('invoice.currency')}</label>
-                  <select
-                    value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="CNY">CNY</option>
-                  </select>
+                {/* Line Items */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-foreground">{t('invoice.items')}</h3>
+                    <button onClick={addLineItem} className="text-sm text-primary hover:underline flex items-center gap-1">
+                      <Plus className="w-3.5 h-3.5" />
+                      {t('invoice.addItem')}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {lineItems.map((item, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={item.description}
+                          onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                          placeholder={t('invoice.descriptionPlaceholder')}
+                          className="flex-1 px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateLineItem(index, 'quantity', e.target.value)}
+                          min="1"
+                          className="w-16 px-2 py-2 bg-secondary border border-border rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <input
+                          type="number"
+                          value={item.rate}
+                          onChange={(e) => updateLineItem(index, 'rate', e.target.value)}
+                          min="0"
+                          placeholder="0"
+                          className="w-24 px-2 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <span className="w-20 text-sm text-foreground text-right">${item.amount.toLocaleString()}</span>
+                        <button
+                          onClick={() => removeLineItem(index)}
+                          className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                          disabled={lineItems.length === 1}
+                        >
+                          <Trash2 className={`w-3.5 h-3.5 ${lineItems.length === 1 ? 'text-muted-foreground/30' : 'text-red-500'}`} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Invoice Details */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">{t('invoice.currency')}</label>
+                    <select
+                      value={formData.currency}
+                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="CNY">CNY</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">{t('invoice.dueDate')}</label>
+                    <input
+                      type="date"
+                      value={formData.dueDate}
+                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">{t('invoice.dueDate')}</label>
-                  <input
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '发票备注' : 'Invoice Note'}</label>
+                  <textarea
+                    rows={3}
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder={language === 'zh' ? '付款条款、银行信息等...' : 'Payment terms, bank details, etc...'}
+                    className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                   />
                 </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '发票备注' : 'Invoice Note'}</label>
-                <textarea
-                  rows={3}
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder={language === 'zh' ? '付款条款、银行信息等...' : 'Payment terms, bank details, etc...'}
-                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                />
+              {/* Right: Live Preview (matches PDF output) */}
+              <div className="w-1/2 overflow-y-auto p-6 bg-secondary/30 flex items-start justify-center">
+                <div className="bg-white rounded-sm shadow-lg w-full max-w-[420px] aspect-[210/297] p-8 relative flex flex-col text-[#333]" style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}>
+                  {/* Invoice Title */}
+                  <h1 className="text-[24px] font-bold" style={{ color: 'rgb(41, 98, 255)' }}>Invoice</h1>
+
+                  {/* Invoice details - top right */}
+                  <div className="absolute top-8 right-8 text-[8px] space-y-1">
+                    <div className="flex gap-4">
+                      <span className="text-gray-400">Invoice No.</span>
+                      <span className="font-bold text-[#333]">INV-NEW</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="text-gray-400">Date</span>
+                      <span className="text-[#333]">{new Date().toISOString().split('T')[0]}</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="text-gray-400">Invoice Due</span>
+                      <span className="text-[#333]">{formData.dueDate || '—'}</span>
+                    </div>
+                  </div>
+
+                  {/* From Section */}
+                  <div className="mt-4">
+                    <p className="text-[8px] font-bold text-gray-400">From</p>
+                    <p className="text-[10px] font-bold mt-0.5">{defaultFromCompany.name}</p>
+                    <p className="text-[8px] text-[#333]">{defaultFromCompany.address}</p>
+                    <p className="text-[8px] text-[#333]">{defaultFromCompany.city}</p>
+                    <p className="text-[8px] text-[#333]">{defaultFromCompany.country}</p>
+                  </div>
+
+                  {/* To Section */}
+                  <div className="mt-3">
+                    <p className="text-[8px] font-bold text-gray-400">To</p>
+                    <p className="text-[10px] font-bold mt-0.5">{formData.merchant || '—'}</p>
+                    <p className="text-[8px] text-[#333]">{formData.toCompanyAddress || ''}</p>
+                    <p className="text-[8px] text-[#333]">{formData.toCompanyCity || ''}</p>
+                    <p className="text-[8px] text-[#333]">{formData.toCompanyCountry || 'United States'}</p>
+                  </div>
+
+                  {/* Items Table */}
+                  <div className="mt-4">
+                    {/* Table Header */}
+                    <div className="bg-[#f5f5f5] px-2 py-1.5 grid grid-cols-12 gap-1 text-[7px] font-bold text-[#333]">
+                      <div className="col-span-6">Description</div>
+                      <div className="col-span-2">Quantity</div>
+                      <div className="col-span-2">Rate</div>
+                      <div className="col-span-2">Amount</div>
+                    </div>
+                    {/* Table Rows */}
+                    {lineItems.filter(item => item.description || item.rate > 0).length > 0 ? (
+                      lineItems.filter(item => item.description || item.rate > 0).map((item, index) => (
+                        <div key={index} className="px-2 py-1 grid grid-cols-12 gap-1 text-[8px] text-[#333]">
+                          <div className="col-span-6">{item.description || '—'}</div>
+                          <div className="col-span-2">{item.quantity}</div>
+                          <div className="col-span-2">${item.rate.toLocaleString()}</div>
+                          <div className="col-span-2">${item.amount.toLocaleString()}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-2 py-3 text-center text-[8px] text-gray-300">
+                        {language === 'zh' ? '添加项目后显示' : 'Items will appear here'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Separator */}
+                  <div className="mt-2 border-t border-gray-200" />
+
+                  {/* Totals */}
+                  <div className="mt-3 flex justify-end">
+                    <div className="w-40 space-y-1 text-[8px]">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Sub Total</span>
+                        <span className="text-[#333]">${calculateTotal().toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-[10px]">
+                        <span className="text-[#333]">Total</span>
+                        <span className="text-[#333]">${calculateTotal().toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Paid to Date</span>
+                        <span className="text-[#333]">$0</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-[10px]">
+                        <span style={{ color: 'rgb(41, 98, 255)' }}>Balance</span>
+                        <span style={{ color: 'rgb(41, 98, 255)' }}>${calculateTotal().toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Invoice Note */}
+                  <div className="mt-4 bg-[#f5f5f5] rounded-sm p-3">
+                    <p className="text-[9px] font-bold text-[#333]">Invoice Note</p>
+                    <p className="text-[7px] text-gray-400 mt-1">{formData.notes || 'Payment terms: Net 30 days. Thank you for your business!'}</p>
+                    <p className="text-[7px] text-[#333] mt-1">Bank: {defaultFromCompany.bankName}</p>
+                    <p className="text-[7px] text-[#333]">Account: {defaultFromCompany.bankAccount}</p>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="mt-auto pt-4 flex justify-between items-center text-[7px]">
+                    <span className="text-gray-400">{defaultFromCompany.email}</span>
+                    <span style={{ color: 'rgb(41, 98, 255)' }}>Powered by SollAI</span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="flex gap-3 p-4 border-t border-border">
-              <Button variant="outline" className="flex-1" onClick={() => setShowCreateModal(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button className="flex-1" onClick={handleCreateInvoice}>
-                {t('invoice.submit')}
-              </Button>
             </div>
           </div>
         </div>
@@ -940,7 +1054,7 @@ export default function InvoicePage() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowDetailModal(false)} />
           <div className="relative bg-card border border-border rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">{selectedInvoice.id}</h2>
+              <h2 className="text-lg font-semibold text-foreground">{formatInvoiceId(selectedInvoice.id)}</h2>
               <button onClick={() => setShowDetailModal(false)} className="p-1.5 hover:bg-secondary rounded-lg transition-colors">
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
@@ -1031,7 +1145,15 @@ export default function InvoicePage() {
             <div className="flex gap-3 p-4 border-t border-border">
               <Button variant="outline" className="flex-1" onClick={() => handleDownloadInvoice(selectedInvoice)}>
                 <Download className="w-4 h-4" />
-                {language === 'zh' ? '下载 PDF' : 'Download PDF'}
+                {language === 'zh' ? '下载' : 'PDF'}
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => handleSendEmail(selectedInvoice)} disabled={sendingEmail === selectedInvoice.id}>
+                {sendingEmail === selectedInvoice.id ? (
+                  <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-primary rounded-full animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4" />
+                )}
+                {sendingEmail === selectedInvoice.id ? (language === 'zh' ? '发送中...' : 'Sending...') : (language === 'zh' ? '邮件' : 'Email')}
               </Button>
               {selectedInvoice.status !== 'paid' && (
                 <Button className="flex-1" onClick={() => { handleMarkAsPaid(selectedInvoice.id); setShowDetailModal(false); }}>
@@ -1044,6 +1166,61 @@ export default function InvoicePage() {
                   {t('common.close')}
                 </Button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Email Modal */}
+      {emailTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEmailTarget(null)} />
+          <div className="relative bg-card border border-border rounded-xl shadow-xl w-full max-w-sm mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-sm font-semibold text-foreground">{language === 'zh' ? '发送发票邮件' : 'Send Invoice Email'}</h2>
+              <button onClick={() => setEmailTarget(null)} className="p-1 hover:bg-secondary rounded-lg transition-colors">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{language === 'zh' ? '收件人邮箱' : 'Recipient Email'}</label>
+                <input
+                  type="email"
+                  value={emailTarget.email}
+                  onChange={(e) => setEmailTarget({ ...emailTarget, email: e.target.value })}
+                  placeholder="email@example.com"
+                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  autoFocus
+                />
+              </div>
+              {emailTarget.invoice.toCompany.email && emailTarget.email !== emailTarget.invoice.toCompany.email && (
+                <button
+                  onClick={() => setEmailTarget({ ...emailTarget, email: emailTarget.invoice.toCompany.email })}
+                  className="flex items-center gap-2 w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-sm hover:bg-secondary transition-colors text-left"
+                >
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">{language === 'zh' ? '商户邮箱：' : 'Merchant: '}</span>
+                  <span className="text-foreground truncate">{emailTarget.invoice.toCompany.email}</span>
+                </button>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {language === 'zh'
+                  ? `将发送 ${formatInvoiceId(emailTarget.invoice.id)} 的 PDF 附件`
+                  : `Will send ${formatInvoiceId(emailTarget.invoice.id)} with PDF attached`}
+              </p>
+            </div>
+            <div className="flex gap-3 p-4 border-t border-border">
+              <Button variant="outline" className="flex-1" onClick={() => setEmailTarget(null)}>
+                {t('common.cancel')}
+              </Button>
+              <Button className="flex-1" onClick={confirmSendEmail} disabled={sendingEmail === emailTarget.invoice.id || !emailTarget.email}>
+                {sendingEmail === emailTarget.invoice.id ? (
+                  <>{language === 'zh' ? '发送中...' : 'Sending...'}</>
+                ) : (
+                  <><Mail className="w-4 h-4" />{language === 'zh' ? '发送' : 'Send'}</>
+                )}
+              </Button>
             </div>
           </div>
         </div>

@@ -1,42 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Layout, Header } from '@/components/layout';
-import { Download, Upload, Building2, Sun, Moon, Monitor, Globe } from 'lucide-react';
+import { Download, Upload, Building2, Globe } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { Button } from '@/components/ui/Button';
-
-type Theme = 'light' | 'dark' | 'system';
 
 export default function SettingsPage() {
   const { t, language, setLanguage } = useI18n();
-  const [theme, setThemeState] = useState<Theme>('system');
-
-  useEffect(() => {
-    const stored = localStorage.getItem('theme') as Theme | null;
-    if (stored) {
-      setThemeState(stored);
-    }
-  }, []);
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem('theme', newTheme);
-
-    const root = document.documentElement;
-    if (newTheme === 'dark') {
-      root.classList.add('dark');
-    } else if (newTheme === 'light') {
-      root.classList.remove('dark');
-    } else {
-      // System preference
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    }
-  };
 
   const handleExport = async () => {
     try {
@@ -44,7 +13,6 @@ export default function SettingsPage() {
         version: '1.0.0',
         exportDate: new Date().toISOString(),
         settings: {
-          theme,
           language,
         },
       };
@@ -76,9 +44,6 @@ export default function SettingsPage() {
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (data.settings?.theme) {
-          setTheme(data.settings.theme);
-        }
         if (data.settings?.language) {
           setLanguage(data.settings.language);
         }
@@ -96,54 +61,6 @@ export default function SettingsPage() {
       <Header title={t('settings.title')} />
 
       <div className="p-4 md:p-6 space-y-6">
-        {/* Theme Settings */}
-        <section>
-          <h2 className="text-base font-semibold text-foreground mb-4">{t('theme.title')}</h2>
-          <div className="bg-card rounded-lg border border-border p-4">
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                onClick={() => setTheme('light')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
-                  theme === 'light'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <Sun className={`w-6 h-6 ${theme === 'light' ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={`text-sm font-medium ${theme === 'light' ? 'text-primary' : 'text-foreground'}`}>
-                  {t('theme.light')}
-                </span>
-              </button>
-              <button
-                onClick={() => setTheme('dark')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
-                  theme === 'dark'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <Moon className={`w-6 h-6 ${theme === 'dark' ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-primary' : 'text-foreground'}`}>
-                  {t('theme.dark')}
-                </span>
-              </button>
-              <button
-                onClick={() => setTheme('system')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
-                  theme === 'system'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <Monitor className={`w-6 h-6 ${theme === 'system' ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={`text-sm font-medium ${theme === 'system' ? 'text-primary' : 'text-foreground'}`}>
-                  {t('theme.system')}
-                </span>
-              </button>
-            </div>
-          </div>
-        </section>
-
         {/* Language Settings */}
         <section>
           <h2 className="text-base font-semibold text-foreground mb-4">{t('language.title')}</h2>
@@ -193,8 +110,8 @@ export default function SettingsPage() {
               onClick={handleExport}
               className="w-full flex items-center gap-3 p-4 text-left hover:bg-secondary/50 transition-colors"
             >
-              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <Download className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="w-10 h-10 rounded-lg bg-blue-900/30 flex items-center justify-center">
+                <Download className="w-5 h-5 text-blue-400" />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-foreground">{t('data.export')}</p>
@@ -205,8 +122,8 @@ export default function SettingsPage() {
               onClick={handleImport}
               className="w-full flex items-center gap-3 p-4 text-left hover:bg-secondary/50 transition-colors"
             >
-              <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <Upload className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <div className="w-10 h-10 rounded-lg bg-green-900/30 flex items-center justify-center">
+                <Upload className="w-5 h-5 text-green-400" />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-foreground">{t('data.import')}</p>

@@ -52,7 +52,7 @@ export default function CreatorsPage() {
       case 'instagram': return <Instagram className="w-4 h-4 text-pink-500" />;
       case 'youtube': return <Youtube className="w-4 h-4 text-red-500" />;
       case 'twitter': return <Twitter className="w-4 h-4 text-blue-400" />;
-      case 'tiktok': return <span className="w-4 h-4 text-black dark:text-white font-bold text-xs">TT</span>;
+      case 'tiktok': return <span className="w-4 h-4 text-white font-bold text-xs">TT</span>;
       case 'bilibili': return <span className="w-4 h-4 text-blue-500 font-bold text-xs">B</span>;
       default: return null;
     }
@@ -208,8 +208,8 @@ export default function CreatorsPage() {
                       <td className="px-4 py-3">
                         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                           creator.status === 'active'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            ? 'bg-green-900/30 text-green-400'
+                            : 'bg-yellow-900/30 text-yellow-400'
                         }`}>
                           {creator.status}
                         </span>
@@ -365,8 +365,8 @@ export default function CreatorsPage() {
                   <p className="text-xs text-muted-foreground">{t('creators.status')}</p>
                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
                     selectedCreator.status === 'active'
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                      ? 'bg-green-900/30 text-green-400'
+                      : 'bg-yellow-900/30 text-yellow-400'
                   }`}>
                     {selectedCreator.status}
                   </span>

@@ -1,39 +1,49 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Layout, Header } from '@/components/layout';
 import { useI18n } from '@/lib/i18n';
-import { Users, Store, FileText, Wallet, TrendingUp, Calendar, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { db, Tables } from '@/lib/supabase/hooks';
+import { Users, Store, FileText, Wallet, TrendingUp, Calendar, CheckCircle, Clock, XCircle, Loader2 } from 'lucide-react';
+
+function formatInvoiceId(id: string) {
+  return `INV-${id.substring(0, 8).toUpperCase()}`;
+}
 
 export default function DashboardPage() {
   const { t } = useI18n();
+  const [creators, setCreators] = useState<Tables<'creators'>[]>([]);
+  const [merchants, setMerchants] = useState<Tables<'merchants'>[]>([]);
+  const [invoices, setInvoices] = useState<Tables<'invoices'>[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data matching other pages
-  const creators = [
-    { id: 1, name: 'Sarah Johnson', status: 'active' },
-    { id: 2, name: 'Mike Chen', status: 'active' },
-    { id: 3, name: 'Lisa Wang', status: 'pending' },
-  ];
-
-  const merchants = [
-    { id: 1, name: 'TechBrand Inc.', status: 'active' },
-    { id: 2, name: 'Fashion Forward', status: 'active' },
-    { id: 3, name: 'Beauty Co.', status: 'pending' },
-  ];
-
-  const invoices = [
-    { id: 'INV-2024-001', merchant: 'TechBrand Inc.', campaign: 'Summer Collection 2024', amount: 2500, status: 'paid', date: '2024-01-15' },
-    { id: 'INV-2024-002', merchant: 'Fashion Forward', campaign: 'Tech Review Series', amount: 1800, status: 'pending', date: '2024-01-14' },
-    { id: 'INV-2024-003', merchant: 'Beauty Co.', campaign: 'Fashion Week Promo', amount: 3200, status: 'overdue', date: '2024-01-13' },
-    { id: 'INV-2024-004', merchant: 'Sports Plus', campaign: 'Fitness Challenge', amount: 1500, status: 'paid', date: '2024-01-12' },
-    { id: 'INV-2024-005', merchant: 'Food & Co.', campaign: 'Recipe Series', amount: 2100, status: 'pending', date: '2024-01-11' },
-    { id: 'INV-2024-006', merchant: 'Travel World', campaign: 'Destination Review', amount: 4500, status: 'paid', date: '2024-01-10' },
-    { id: 'INV-2024-007', merchant: 'Gaming Hub', campaign: 'Game Launch Event', amount: 3800, status: 'draft', date: '2024-01-09' },
-    { id: 'INV-2024-008', merchant: 'Music Live', campaign: 'Concert Promo', amount: 2800, status: 'paid', date: '2024-01-08' },
-  ];
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [creatorsData, merchantsData, invoicesData] = await Promise.all([
+          db.creators.getAll(),
+          db.merchants.getAll(),
+          db.invoices.getAll(),
+        ]);
+        setCreators(creatorsData);
+        setMerchants(merchantsData);
+        setInvoices(invoicesData);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
 
   const pendingInvoices = invoices.filter(inv => inv.status === 'pending').length;
-  const totalRevenue = invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
+  const totalRevenue = invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (inv.amount || 0), 0);
   const recentInvoices = invoices.slice(0, 5);
+  const upcomingInvoices = invoices
+    .filter(inv => inv.status === 'pending' || inv.status === 'overdue')
+    .sort((a, b) => new Date(a.due_date || '').getTime() - new Date(b.due_date || '').getTime())
+    .slice(0, 3);
 
   const stats = [
     { label: t('dashboard.totalCreators'), value: creators.length.toString(), icon: Users, color: 'blue' },
@@ -50,6 +60,17 @@ export default function DashboardPage() {
       default: return <FileText className="w-4 h-4 text-gray-400" />;
     }
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <Header title={t('dashboard.title')} />
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -82,18 +103,22 @@ export default function DashboardPage() {
               {t('dashboard.recentActivity')}
             </h3>
             <div className="space-y-2">
-              {recentInvoices.map((invoice) => (
-                <div key={invoice.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(invoice.status)}
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{invoice.id}</p>
-                      <p className="text-xs text-muted-foreground">{invoice.merchant} - {invoice.campaign}</p>
+              {recentInvoices.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">No invoices yet</p>
+              ) : (
+                recentInvoices.map((invoice) => (
+                  <div key={invoice.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(invoice.status || 'draft')}
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{formatInvoiceId(invoice.id)}</p>
+                        <p className="text-xs text-muted-foreground">{invoice.merchant || 'Unknown'} - {invoice.description || 'No description'}</p>
+                      </div>
                     </div>
+                    <span className="text-sm font-medium text-foreground">${(invoice.amount || 0).toLocaleString()}</span>
                   </div>
-                  <span className="text-sm font-medium text-foreground">${invoice.amount.toLocaleString()}</span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -103,33 +128,29 @@ export default function DashboardPage() {
               {t('dashboard.upcomingEvents')}
             </h3>
             <div className="space-y-2">
-              <div className="flex items-center gap-3 py-2 border-b border-border">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <span className="text-xs font-bold text-blue-500">15</span>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">INV-2024-002 {t('invoice.dueDate')}</p>
-                  <p className="text-xs text-muted-foreground">Fashion Forward - $1,800</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 py-2 border-b border-border">
-                <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <span className="text-xs font-bold text-red-500">13</span>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">INV-2024-003 {t('invoice.status.overdue')}</p>
-                  <p className="text-xs text-muted-foreground">Beauty Co. - $3,200</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 py-2">
-                <div className="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                  <span className="text-xs font-bold text-yellow-500">11</span>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">INV-2024-005 {t('invoice.dueDate')}</p>
-                  <p className="text-xs text-muted-foreground">Food & Co. - $2,100</p>
-                </div>
-              </div>
+              {upcomingInvoices.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">No upcoming events</p>
+              ) : (
+                upcomingInvoices.map((invoice, index) => {
+                  const isOverdue = invoice.status === 'overdue';
+                  const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+                  const dayNum = dueDate ? dueDate.getDate().toString() : '—';
+                  const colorClass = isOverdue ? 'red' : 'blue';
+                  return (
+                    <div key={invoice.id} className={`flex items-center gap-3 py-2 ${index < upcomingInvoices.length - 1 ? 'border-b border-border' : ''}`}>
+                      <div className={`w-10 h-10 rounded-lg bg-${colorClass}-500/10 flex items-center justify-center`}>
+                        <span className={`text-xs font-bold text-${colorClass}-500`}>{dayNum}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {formatInvoiceId(invoice.id)} {isOverdue ? t('invoice.status.overdue') : t('invoice.dueDate')}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{invoice.merchant || 'Unknown'} - ${(invoice.amount || 0).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

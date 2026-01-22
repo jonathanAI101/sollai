@@ -339,7 +339,7 @@ export function LogoSplit({ size = 'md', className = '' }: Omit<LogoProps, 'vari
         <path
           d="M28 16H20C17.7909 16 16 17.7909 16 20C16 22.2091 17.7909 24 20 24H28C30.2091 24 32 25.7909 32 28C32 30.2091 30.2091 32 28 32H20"
           stroke="white"
-          className="dark:stroke-background"
+          className="stroke-background"
           strokeWidth="3"
           strokeLinecap="round"
           fill="none"
