@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from './client';
-import type { Database, InvoiceWithRelations } from './types';
+import type { Database, InvoiceWithRelations, InvoiceAuditLog } from './types';
 
 // Type helpers
 export type Tables<T extends keyof Database['public']['Tables']> =
@@ -11,7 +11,7 @@ export type InsertTables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Insert'];
 export type UpdateTables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Update'];
-export type { InvoiceWithRelations };
+export type { InvoiceWithRelations, InvoiceAuditLog };
 
 // Supabase client singleton
 let supabaseClient: ReturnType<typeof createClient> | null = null;
@@ -97,6 +97,7 @@ export const db = {
       const { data, error } = await supabase
         .from('merchants')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as Tables<'merchants'>[];
@@ -137,6 +138,14 @@ export const db = {
       const { error } = await supabase.from('merchants').delete().eq('id', id);
       if (error) throw error;
     },
+    async softDelete(id: string) {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('merchants')
+        .update({ deleted_at: new Date().toISOString() } as never)
+        .eq('id', id);
+      if (error) throw error;
+    },
   },
 
   creators: {
@@ -145,6 +154,7 @@ export const db = {
       const { data, error } = await supabase
         .from('creators')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as Tables<'creators'>[];
@@ -183,6 +193,14 @@ export const db = {
     async delete(id: string) {
       const supabase = getSupabase();
       const { error } = await supabase.from('creators').delete().eq('id', id);
+      if (error) throw error;
+    },
+    async softDelete(id: string) {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('creators')
+        .update({ deleted_at: new Date().toISOString() } as never)
+        .eq('id', id);
       if (error) throw error;
     },
   },
@@ -251,6 +269,39 @@ export const db = {
         .eq('merchant_id', merchantId);
       if (error) throw error;
       return count || 0;
+    },
+  },
+
+  invoiceAudit: {
+    async log(params: {
+      invoice_id: string;
+      action: InvoiceAuditLog['action'];
+      old_value?: Record<string, unknown>;
+      new_value?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+    }) {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('invoice_audit_logs')
+        .insert({
+          invoice_id: params.invoice_id,
+          action: params.action,
+          old_value: (params.old_value || null) as never,
+          new_value: (params.new_value || null) as never,
+          metadata: (params.metadata || null) as never,
+        } as never);
+      if (error) console.error('Audit log failed:', error);
+    },
+
+    async getByInvoice(invoiceId: string): Promise<InvoiceAuditLog[]> {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('invoice_audit_logs')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as unknown as InvoiceAuditLog[];
     },
   },
 };

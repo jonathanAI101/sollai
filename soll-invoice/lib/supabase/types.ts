@@ -24,6 +24,7 @@ export type Database = {
           postal_code: string | null;
           tax_id: string | null;
           notes: string | null;
+          deleted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -41,6 +42,7 @@ export type Database = {
           postal_code?: string | null;
           tax_id?: string | null;
           notes?: string | null;
+          deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -58,6 +60,7 @@ export type Database = {
           postal_code?: string | null;
           tax_id?: string | null;
           notes?: string | null;
+          deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -75,6 +78,7 @@ export type Database = {
           phone: string | null;
           social_handle: string | null;
           notes: string | null;
+          deleted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -89,6 +93,7 @@ export type Database = {
           phone?: string | null;
           social_handle?: string | null;
           notes?: string | null;
+          deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -103,6 +108,7 @@ export type Database = {
           phone?: string | null;
           social_handle?: string | null;
           notes?: string | null;
+          deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -125,6 +131,8 @@ export type Database = {
           to_company: Json;
           paid_to_date: number;
           notes: string | null;
+          voided_at: string | null;
+          voided_reason: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -144,6 +152,8 @@ export type Database = {
           to_company?: Json;
           paid_to_date?: number;
           notes?: string | null;
+          voided_at?: string | null;
+          voided_reason?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -163,8 +173,43 @@ export type Database = {
           to_company?: Json;
           paid_to_date?: number;
           notes?: string | null;
+          voided_at?: string | null;
+          voided_reason?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+
+      invoice_audit_logs: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          user_id: string | null;
+          action: string;
+          old_value: Json | null;
+          new_value: Json | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          user_id?: string | null;
+          action: string;
+          old_value?: Json | null;
+          new_value?: Json | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string;
+          user_id?: string | null;
+          action?: string;
+          old_value?: Json | null;
+          new_value?: Json | null;
+          metadata?: Json | null;
+          created_at?: string;
         };
       };
     };
@@ -193,3 +238,15 @@ export type InvoiceWithRelations = Tables<'invoices'> & {
   merchants: Tables<'merchants'> | null;
   creators: Tables<'creators'> | null;
 };
+
+// Audit log type
+export interface InvoiceAuditLog {
+  id: string;
+  invoice_id: string;
+  user_id: string | null;
+  action: 'created' | 'status_changed' | 'updated' | 'voided' | 'email_sent' | 'deleted';
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}

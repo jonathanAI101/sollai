@@ -5,7 +5,8 @@ import { Layout, Header } from '@/components/layout';
 import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
 import { Plus, Search, Filter, Instagram, Youtube, Twitter, X, Eye, Trash2 } from 'lucide-react';
-import { db, type Tables } from '@/lib/supabase/hooks';
+import { db, type Tables, type InvoiceWithRelations } from '@/lib/supabase/hooks';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 type Creator = Tables<'creators'>;
 
@@ -19,7 +20,9 @@ export default function CreatorsPage() {
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [creators, setCreators] = useState<Creator[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -38,13 +41,21 @@ export default function CreatorsPage() {
   const fetchCreators = async () => {
     try {
       setLoading(true);
-      const data = await db.creators.getAll();
-      setCreators(data);
+      const [creatorsData, invoicesData] = await Promise.all([
+        db.creators.getAll(),
+        db.invoices.getAll(),
+      ]);
+      setCreators(creatorsData);
+      setInvoices(invoicesData);
     } catch (error) {
       console.error('Failed to fetch creators:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getInvoiceCount = (creatorId: string) => {
+    return invoices.filter(inv => inv.creator_id === creatorId).length;
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -98,8 +109,23 @@ export default function CreatorsPage() {
   };
 
   const handleDeleteCreator = async (id: string) => {
+    const invoiceCount = getInvoiceCount(id);
+    const message = invoiceCount > 0
+      ? `该创作者有 ${invoiceCount} 条发票记录，删除后发票将失去创作者关联。确定要删除吗？`
+      : '确定要删除该创作者吗？此操作不可撤销。';
+
+    const confirmed = await confirm({
+      title: '删除创作者',
+      message,
+      confirmText: '确认删除',
+      cancelText: '取消',
+      variant: invoiceCount > 0 ? 'warning' : 'danger',
+    });
+
+    if (!confirmed) return;
+
     try {
-      await db.creators.delete(id);
+      await db.creators.softDelete(id);
       setShowDetailModal(false);
       fetchCreators();
     } catch (error) {
@@ -326,6 +352,8 @@ export default function CreatorsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog />
 
       {/* Creator Detail Modal */}
       {showDetailModal && selectedCreator && (

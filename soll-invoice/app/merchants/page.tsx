@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
 import { Plus, Search, Filter, Building2, Globe, X, Eye, Trash2, Mail, Phone, Pencil, FileText } from 'lucide-react';
 import { db, type Tables, type InvoiceWithRelations } from '@/lib/supabase/hooks';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 type Merchant = Tables<'merchants'>;
 
@@ -22,6 +23,7 @@ export default function MerchantsPage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [invoices, setInvoices] = useState<InvoiceWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -98,8 +100,23 @@ export default function MerchantsPage() {
   };
 
   const handleDeleteMerchant = async (id: string) => {
+    const invoiceCount = getInvoiceCount(id);
+    const message = invoiceCount > 0
+      ? `该商户有 ${invoiceCount} 条发票记录，删除后发票将失去商户关联。确定要删除吗？`
+      : '确定要删除该商户吗？此操作不可撤销。';
+
+    const confirmed = await confirm({
+      title: '删除商户',
+      message,
+      confirmText: '确认删除',
+      cancelText: '取消',
+      variant: invoiceCount > 0 ? 'warning' : 'danger',
+    });
+
+    if (!confirmed) return;
+
     try {
-      await db.merchants.delete(id);
+      await db.merchants.softDelete(id);
       setShowDetailModal(false);
       fetchMerchants();
     } catch (error) {
@@ -485,6 +502,8 @@ export default function MerchantsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog />
 
       {/* Edit Merchant Modal */}
       {showEditModal && editingMerchant && (

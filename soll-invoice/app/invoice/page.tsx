@@ -6,7 +6,8 @@ import { useI18n } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
 import { db, type Tables, type InvoiceWithRelations } from '@/lib/supabase/hooks';
 import type { Json } from '@/lib/supabase/types';
-import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Mail } from 'lucide-react';
+import { Plus, Search, Filter, Download, Eye, MoreHorizontal, CheckCircle, Clock, XCircle, FileText, X, Trash2, Mail, Ban, History } from 'lucide-react';
+import { InvoiceHistory } from '@/components/invoice/InvoiceHistory';
 import { jsPDF } from 'jspdf';
 
 type InvoiceItem = {
@@ -36,7 +37,7 @@ type Invoice = {
   currency: string;
   issueDate: string;
   dueDate: string;
-  status: 'paid' | 'pending' | 'overdue' | 'draft';
+  status: 'paid' | 'pending' | 'overdue' | 'draft' | 'voided';
   items: InvoiceItem[];
   fromCompany: CompanyInfo;
   toCompany: CompanyInfo;
@@ -61,10 +62,11 @@ export default function InvoicePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending' | 'overdue' | 'draft'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending' | 'overdue' | 'draft' | 'voided'>('all');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [emailTarget, setEmailTarget] = useState<{ invoice: Invoice; email: string } | null>(null);
 
   // Click-outside to close menus
@@ -169,6 +171,7 @@ export default function InvoicePage() {
       case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'overdue': return <XCircle className="w-4 h-4 text-red-500" />;
       case 'draft': return <FileText className="w-4 h-4 text-gray-400" />;
+      case 'voided': return <Ban className="w-4 h-4 text-gray-400" />;
       default: return null;
     }
   };
@@ -179,6 +182,7 @@ export default function InvoicePage() {
       case 'pending': return 'bg-yellow-900/30 text-yellow-400';
       case 'overdue': return 'bg-red-900/30 text-red-400';
       case 'draft': return 'bg-gray-800 text-gray-400';
+      case 'voided': return 'bg-gray-900/30 text-gray-400 line-through';
       default: return '';
     }
   };
@@ -189,6 +193,7 @@ export default function InvoicePage() {
       pending: t('invoice.status.pending'),
       overdue: t('invoice.status.overdue'),
       draft: t('invoice.status.draft'),
+      voided: language === 'zh' ? '已作废' : 'Voided',
     };
     return labels[status] || status;
   };
@@ -440,7 +445,7 @@ export default function InvoicePage() {
     const validItems = lineItems.filter(item => item.description);
 
     try {
-      await db.invoices.create({
+      const newInvoice = await db.invoices.create({
         merchant_id: formData.merchantId,
         merchant_name_snapshot: formData.merchantName,
         description: validItems[0]?.description || 'Marketing services',
@@ -465,6 +470,12 @@ export default function InvoicePage() {
         notes: formData.notes || 'Payment terms: Net 30 days. Thank you for your business!',
       });
 
+      await db.invoiceAudit.log({
+        invoice_id: newInvoice.id,
+        action: 'created',
+        new_value: { amount: total, merchant: formData.merchantName, status: 'draft' },
+      });
+
       await fetchInvoices();
       setShowCreateModal(false);
       setFormData({ merchantId: '', merchantName: '', description: '', currency: 'USD', dueDate: '', notes: '', toCompanyName: '', toCompanyAddress: '', toCompanyCity: '', toCompanyCountry: '', toCompanyEmail: '' });
@@ -477,6 +488,7 @@ export default function InvoicePage() {
   const handleViewInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setShowDetailModal(true);
+    setShowHistory(false);
     setShowMoreMenu(null);
   };
 
@@ -532,6 +544,13 @@ export default function InvoicePage() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
+      await db.invoiceAudit.log({
+        invoice_id: invoice.id,
+        action: 'email_sent',
+        metadata: { recipient: email, timestamp: new Date().toISOString() },
+      });
+
       alert(language === 'zh' ? `邮件已发送至 ${email}` : `Email sent to ${email}`);
       setEmailTarget(null);
     } catch (e) {
@@ -570,21 +589,90 @@ export default function InvoicePage() {
   };
 
   const handleDeleteInvoice = async (id: string) => {
+    const invoice = invoices.find(inv => inv.id === id);
+
+    // 已付款发票不允许删除
+    if (invoice?.status === 'paid') {
+      alert(language === 'zh'
+        ? '已付款发票不能删除，只能作废'
+        : 'Paid invoices cannot be deleted, only voided');
+      return;
+    }
+
+    // 非草稿状态需要二次确认
+    if (invoice?.status !== 'draft') {
+      const confirmed = window.confirm(
+        language === 'zh'
+          ? `确定要删除发票 ${formatInvoiceId(id)}？此操作不可撤销。`
+          : `Are you sure you want to delete invoice ${formatInvoiceId(id)}? This cannot be undone.`
+      );
+      if (!confirmed) return;
+    }
+
     try {
+      await db.invoiceAudit.log({
+        invoice_id: id,
+        action: 'deleted',
+        old_value: { status: invoice?.status, amount: invoice?.amount },
+      });
+
       await db.invoices.delete(id);
       setInvoices(invoices.filter(inv => inv.id !== id));
       setShowDetailModal(false);
       setShowMoreMenu(null);
     } catch (e) {
       console.error('Failed to delete invoice:', e);
+      alert(language === 'zh' ? '删除失败' : 'Failed to delete');
+    }
+  };
+
+  const handleVoidInvoice = async (id: string) => {
+    const invoice = invoices.find(inv => inv.id === id);
+    const confirmed = window.confirm(
+      language === 'zh'
+        ? '作废后发票将保留记录但标记为无效，确定继续？'
+        : 'Voiding will keep the record but mark it as invalid. Continue?'
+    );
+    if (!confirmed) return;
+
+    try {
+      await db.invoices.update(id, {
+        status: 'voided',
+        voided_at: new Date().toISOString(),
+      });
+
+      await db.invoiceAudit.log({
+        invoice_id: id,
+        action: 'voided',
+        old_value: { status: invoice?.status },
+        new_value: { status: 'voided' },
+      });
+
+      await fetchInvoices();
+      setShowMoreMenu(null);
+    } catch (e) {
+      console.error('Failed to void invoice:', e);
     }
   };
 
   const handleChangeStatus = async (id: string, newStatus: Invoice['status']) => {
+    const invoice = invoices.find(inv => inv.id === id);
+    if (!invoice) return;
+
+    const oldStatus = invoice.status;
+    const paidToDate = newStatus === 'paid' ? invoice.amount : invoice.paidToDate;
+
     try {
-      const invoice = invoices.find(inv => inv.id === id);
-      const paidToDate = newStatus === 'paid' ? (invoice?.amount || 0) : 0;
       await db.invoices.update(id, { status: newStatus, paid_to_date: paidToDate });
+
+      await db.invoiceAudit.log({
+        invoice_id: id,
+        action: 'status_changed',
+        old_value: { status: oldStatus, paid_to_date: invoice.paidToDate },
+        new_value: { status: newStatus, paid_to_date: paidToDate },
+        metadata: { timestamp: new Date().toISOString(), source: 'web_app' },
+      });
+
       setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: newStatus, paidToDate } : inv));
       setShowMoreMenu(null);
     } catch (e) {
@@ -649,7 +737,7 @@ export default function InvoicePage() {
             {showFilterMenu && (
               <div className="absolute right-0 top-full mt-2 w-40 bg-card border border-border rounded-lg shadow-lg z-10 p-2">
                 <p className="text-xs font-medium text-muted-foreground px-2 py-1">{t('invoice.status')}</p>
-                {['all', 'paid', 'pending', 'overdue', 'draft'].map((status) => (
+                {['all', 'paid', 'pending', 'overdue', 'draft', 'voided'].map((status) => (
                   <button
                     key={status}
                     onClick={() => { setStatusFilter(status as typeof statusFilter); setShowFilterMenu(false); }}
@@ -738,25 +826,51 @@ export default function InvoicePage() {
                           </button>
                           {showMoreMenu === invoice.id && (
                             <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-lg shadow-lg z-10 py-1">
-                              <p className="text-xs font-medium text-muted-foreground px-3 py-1">{t('invoice.status')}</p>
-                              {(['draft', 'pending', 'paid', 'overdue'] as const).filter(s => s !== invoice.status).map((s) => (
-                                <button
-                                  key={s}
-                                  onClick={() => handleChangeStatus(invoice.id, s)}
-                                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary flex items-center gap-2"
-                                >
-                                  {getStatusIcon(s)}
-                                  {getStatusLabel(s)}
-                                </button>
-                              ))}
+                              {invoice.status !== 'voided' && (
+                                <>
+                                  <p className="text-xs font-medium text-muted-foreground px-3 py-1">{t('invoice.status')}</p>
+                                  {invoice.status !== 'paid'
+                                    ? (['draft', 'pending', 'paid', 'overdue'] as const).filter(s => s !== invoice.status).map((s) => (
+                                        <button
+                                          key={s}
+                                          onClick={() => handleChangeStatus(invoice.id, s)}
+                                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary flex items-center gap-2"
+                                        >
+                                          {getStatusIcon(s)}
+                                          {getStatusLabel(s)}
+                                        </button>
+                                      ))
+                                    : (['pending', 'overdue'] as const).map((s) => (
+                                        <button
+                                          key={s}
+                                          onClick={() => handleChangeStatus(invoice.id, s)}
+                                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary flex items-center gap-2"
+                                        >
+                                          {getStatusIcon(s)}
+                                          {getStatusLabel(s)}
+                                        </button>
+                                      ))
+                                  }
+                                </>
+                              )}
                               <div className="border-t border-border my-1" />
-                              <button
-                                onClick={() => handleDeleteInvoice(invoice.id)}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-secondary flex items-center gap-2 text-red-500"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                {t('common.delete')}
-                              </button>
+                              {invoice.status === 'paid' ? (
+                                <button
+                                  onClick={() => handleVoidInvoice(invoice.id)}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-secondary flex items-center gap-2 text-orange-500"
+                                >
+                                  <Ban className="w-4 h-4" />
+                                  {language === 'zh' ? '作废发票' : 'Void Invoice'}
+                                </button>
+                              ) : invoice.status !== 'voided' ? (
+                                <button
+                                  onClick={() => handleDeleteInvoice(invoice.id)}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-secondary flex items-center gap-2 text-red-500"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  {t('common.delete')}
+                                </button>
+                              ) : null}
                             </div>
                           )}
                         </div>
@@ -1146,6 +1260,23 @@ export default function InvoicePage() {
                   <p className="text-sm text-foreground">{selectedInvoice.notes}</p>
                 </div>
               )}
+
+              {/* History Toggle */}
+              <div className="border-t border-border pt-4">
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <History className="w-4 h-4" />
+                  {language === 'zh' ? '操作历史' : 'History'}
+                  <span className="text-xs">({showHistory ? '−' : '+'})</span>
+                </button>
+                {showHistory && (
+                  <div className="mt-3">
+                    <InvoiceHistory invoiceId={selectedInvoice.id} language={language} />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex gap-3 p-4 border-t border-border">
               <Button variant="outline" className="flex-1" onClick={() => handleDownloadInvoice(selectedInvoice)}>
